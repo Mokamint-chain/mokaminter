@@ -56,6 +56,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.io.mokamint.miner.service)
     implementation(libs.io.mokamint.plotter)
     testImplementation(libs.junit)

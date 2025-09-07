@@ -5,4 +5,7 @@
     <string name="nav_header_title">Mokaminter</string>
     <string name="nav_header_subtitle">The mobile miner for Mokamint</string>
     <string name="nav_header_desc">Navigation header</string>
+    <string name="miners">Miners</string>
+    <string name="add_miner">Add miner</string>
+    <string name="operation_timeout">The operation timed-out!</string>
 </resources>

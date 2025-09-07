@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/nav_miners">
+
+    <fragment
+        android:id="@+id/nav_miners"
+        android:name="io.mokamint.android.mokaminter.view.MinersFragment"
+        android:label="@string/miners"
+        tools:layout="@layout/fragment_miners" >
+        <!--<action
+            android:id="@+id/to_show_account"
+            app:destination="@id/show_or_edit_account" />-->
+
+    </fragment>
+
+</navigation>

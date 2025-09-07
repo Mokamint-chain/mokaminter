@@ -13,6 +13,16 @@ interface View {
      *
      * @param message the message to report
      */
-    @UiThread
-    fun notifyUser(message: String)
+    @UiThread fun notifyUser(message: String)
+
+    /**
+     * Called whenever a background task has started.
+     */
+    @UiThread fun onBackgroundStart() {}
+
+    /**
+     * Called on the main thread whenever a background task has completed.
+     */
+    @UiThread fun onBackgroundEnd() {}
+
 }

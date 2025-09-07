@@ -45,7 +45,7 @@ class Mokaminter : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        Log.d(TAG, "${this::class.simpleName} started")
+        Log.d(TAG, "$TAG started")
     }
 
     override fun onSupportNavigateUp(): Boolean {

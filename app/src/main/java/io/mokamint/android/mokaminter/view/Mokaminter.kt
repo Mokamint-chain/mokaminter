@@ -34,8 +34,9 @@ class Mokaminter : AppCompatActivity() {
         // menu should be considered as top level destination
         appBarConfiguration = AppBarConfiguration(
             setOf(
-                // R.id.nav_accounts, R.id.settings
-            ), binding.drawerLayout
+                R.id.nav_miners
+            ),
+            binding.drawerLayout
         )
 
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)

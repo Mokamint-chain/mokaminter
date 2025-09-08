@@ -6,4 +6,5 @@ import kotlinx.coroutines.Dispatchers
 
 class Model(private val mvc: MVC) {
     private val mainScope = CoroutineScope(Dispatchers.Main)
+
 }

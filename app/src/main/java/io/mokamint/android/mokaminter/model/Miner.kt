@@ -38,6 +38,20 @@ class Miner: Comparable<Miner> {
      */
     val entropy: Entropy;
 
+    companion object {
+
+        private const val MINING_SPECIFICATION_TAG = "miningSpecification"
+        private const val URI_TAG = "uri"
+        private const val ENTROPY_TAG = "entropy"
+        private const val NAME_TAG = "name"
+        private const val DESCRIPTION_TAG = "description"
+        private const val CHAIN_ID_TAG = "chainId"
+        private const val HASHING_FOR_DEADLINES = "hashingForDeadlines"
+        private const val SIGNATURE_FOR_DEADLINES = "signatureForDeadlines"
+        private const val SIGNATURE_FOR_BLOCKS = "signatureForBlocks"
+        private const val PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58 = "publicKeyForSigningBlocksBase58"
+    }
+
     /**
      * Creates the specification of a miner.
      *
@@ -52,8 +66,7 @@ class Miner: Comparable<Miner> {
     }
 
     constructor(parser: XmlPullParser) {
-        parser.require(XmlPullParser.START_TAG, null, "miner")
-
+        val tag = parser.name
         var miningSpecification: MiningSpecification? = null
         var uri: URI? = null
         var entropy: Entropy? = null
@@ -63,23 +76,60 @@ class Miner: Comparable<Miner> {
                 continue
 
             when (parser.name) {
-                "miningSpecification" -> miningSpecification = readMiningSpecification(parser)
-                "uri" -> uri = readURI(parser)
-                "entropy" -> entropy = readEntropy(parser)
+                MINING_SPECIFICATION_TAG -> miningSpecification = readMiningSpecification(parser)
+                URI_TAG -> uri = readURI(parser)
+                ENTROPY_TAG -> entropy = readEntropy(parser)
                 else -> skip(parser)
             }
         }
 
-        parser.require(XmlPullParser.END_TAG, null, "miner")
+        parser.require(XmlPullParser.END_TAG, null, tag)
 
-        this.miningSpecification = miningSpecification ?: throw IOException("Missing mining specification in miner")
-        this.uri = uri ?: throw IOException("Missing URI in miner")
-        this.entropy = entropy ?: throw IOException("Missing entropy in miner")
+        this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing mining specification in miner")
+        this.uri = uri ?: throw XmlPullParserException("Missing URI in miner")
+        this.entropy = entropy ?: throw XmlPullParserException("Missing entropy in miner")
+    }
+
+    fun writeWith(serializer: XmlSerializer, tag: String) {
+        serializer.startTag(null, tag)
+
+        serializer.startTag(null, MINING_SPECIFICATION_TAG)
+        serializer.startTag(null, NAME_TAG)
+        serializer.text(miningSpecification.name)
+        serializer.endTag(null, NAME_TAG)
+        serializer.startTag(null, DESCRIPTION_TAG)
+        serializer.text(miningSpecification.description)
+        serializer.endTag(null, DESCRIPTION_TAG)
+        serializer.startTag(null, CHAIN_ID_TAG)
+        serializer.text(miningSpecification.chainId)
+        serializer.endTag(null, CHAIN_ID_TAG)
+        serializer.startTag(null, HASHING_FOR_DEADLINES)
+        serializer.text(miningSpecification.hashingForDeadlines.name)
+        serializer.endTag(null, HASHING_FOR_DEADLINES)
+        serializer.startTag(null, SIGNATURE_FOR_BLOCKS)
+        serializer.text(miningSpecification.signatureForBlocks.name)
+        serializer.endTag(null, SIGNATURE_FOR_BLOCKS)
+        serializer.startTag(null, SIGNATURE_FOR_DEADLINES)
+        serializer.text(miningSpecification.signatureForDeadlines.name)
+        serializer.endTag(null, SIGNATURE_FOR_DEADLINES)
+        serializer.startTag(null, PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58)
+        serializer.text(miningSpecification.publicKeyForSigningBlocksBase58)
+        serializer.endTag(null, PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58)
+        serializer.endTag(null, MINING_SPECIFICATION_TAG)
+
+        serializer.startTag(null, ENTROPY_TAG)
+        serializer.text(entropy.toString())
+        serializer.endTag(null, ENTROPY_TAG)
+
+        serializer.startTag(null, URI_TAG)
+        serializer.text(uri.toString())
+        serializer.endTag(null, URI_TAG)
+
+        serializer.endTag(null, tag)
     }
 
     private fun readMiningSpecification(parser: XmlPullParser): MiningSpecification {
-        val tag = parser.name
-
+        var tag = parser.name
         var name: String? = null
         var description: String? = null
         var chainId: String? = null
@@ -93,40 +143,38 @@ class Miner: Comparable<Miner> {
                 continue
 
             when (parser.name) {
-                "name" -> name = readText(parser)
-                "description" -> description = readText(parser)
-                "chainId" -> chainId = readText(parser)
-                "hashingForDeadlines" -> hashingForDeadlines = readHashingAlgorithm(parser)
-                "signatureForBlocks" -> signatureForBlocks = readSignatureAlgorithm(parser)
-                "signatureForDeadlines" -> signatureForDeadlines = readSignatureAlgorithm(parser)
-                "publicKeyForSigningBlocksBase58" -> publicKeyForSigningBlocksBase58 = readText(parser)
+                NAME_TAG -> name = readText(parser)
+                DESCRIPTION_TAG -> description = readText(parser)
+                CHAIN_ID_TAG -> chainId = readText(parser)
+                HASHING_FOR_DEADLINES -> hashingForDeadlines = readHashingAlgorithm(parser)
+                SIGNATURE_FOR_BLOCKS -> signatureForBlocks = readSignatureAlgorithm(parser)
+                SIGNATURE_FOR_DEADLINES -> signatureForDeadlines = readSignatureAlgorithm(parser)
+                PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58 -> publicKeyForSigningBlocksBase58 = readText(parser)
                 else -> skip(parser)
             }
         }
 
         if (signatureForBlocks == null)
-            throw IOException("Missing signatureForBlocks tag in miner")
+            throw XmlPullParserException("Missing signatureForBlocks tag in miner")
 
         if (publicKeyForSigningBlocksBase58 == null)
-            throw IOException("Missing publicKeyForSigningBlocksBase58 tag in miner")
+            throw XmlPullParserException("Missing publicKeyForSigningBlocksBase58 tag in miner")
 
         parser.require(XmlPullParser.END_TAG, null, tag)
 
         return MiningSpecifications.of(
-            name ?: throw IOException("Missing name tag in miner"),
-            description ?: throw IOException("Missing description tag in miner"),
-            chainId ?: throw IOException("Missing chainId tag in miner"),
-            hashingForDeadlines ?: throw IOException("Missing hashingForDeadlines tag in miner"),
+            name ?: throw XmlPullParserException("Missing name tag in miner"),
+            description ?: throw XmlPullParserException("Missing description tag in miner"),
+            chainId ?: throw XmlPullParserException("Missing chainId tag in miner"),
+            hashingForDeadlines ?: throw XmlPullParserException("Missing hashingForDeadlines tag in miner"),
             signatureForBlocks,
-            signatureForDeadlines ?: throw IOException("Missing signatureForDeadlines tag in miner"),
-            signatureForBlocks.publicKeyFromEncoding(Base58.fromBase58String(publicKeyForSigningBlocksBase58, ::IOException))
+            signatureForDeadlines ?: throw XmlPullParserException("Missing signatureForDeadlines tag in miner"),
+            signatureForBlocks.publicKeyFromEncoding(Base58.fromBase58String(publicKeyForSigningBlocksBase58, ::XmlPullParserException))
         )
     }
 
     private fun readURI(parser: XmlPullParser): URI {
-        val tag = parser.name
         val entropy = readText(parser)
-        parser.require(XmlPullParser.END_TAG, null, tag)
 
         try {
             return URI(entropy)
@@ -137,9 +185,7 @@ class Miner: Comparable<Miner> {
     }
 
     private fun readHashingAlgorithm(parser: XmlPullParser): HashingAlgorithm {
-        val tag = parser.name
         val signature = readText(parser)
-        parser.require(XmlPullParser.END_TAG, null, tag)
 
         try {
             return HashingAlgorithms.of(signature)
@@ -150,9 +196,7 @@ class Miner: Comparable<Miner> {
     }
 
     private fun readSignatureAlgorithm(parser: XmlPullParser): SignatureAlgorithm {
-        val tag = parser.name
         val signature = readText(parser)
-        parser.require(XmlPullParser.END_TAG, null, tag)
 
         try {
             return SignatureAlgorithms.of(signature)
@@ -163,9 +207,7 @@ class Miner: Comparable<Miner> {
     }
 
     private fun readEntropy(parser: XmlPullParser): Entropy {
-        val tag = parser.name
         val entropy = readText(parser)
-        parser.require(XmlPullParser.END_TAG, null, tag)
 
         try {
             return Entropies.of(Hex.fromHexString(entropy, ::XmlPullParserException))
@@ -176,11 +218,16 @@ class Miner: Comparable<Miner> {
     }
 
     private fun readText(parser: XmlPullParser): String {
+        val tag = parser.name
+
         var result = ""
         if (parser.next() == XmlPullParser.TEXT) {
             result = parser.text
             parser.nextTag()
         }
+
+        parser.require(XmlPullParser.END_TAG, null, tag)
+
         return result
     }
 
@@ -195,10 +242,6 @@ class Miner: Comparable<Miner> {
             }
         }
         while (depth != 0)
-    }
-
-    fun writeWith(serializer: XmlSerializer) { // TODO
-
     }
 
     override fun compareTo(other: Miner): Int {

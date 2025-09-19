@@ -1,5 +1,7 @@
 package io.mokamint.android.mokaminter.model
 
+import android.os.Parcel
+import android.os.Parcelable
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.Entropies
 import io.hotmoka.crypto.HashingAlgorithms
@@ -21,7 +23,7 @@ import java.security.NoSuchAlgorithmException
 /**
  * The specification of a miner.
  */
-class Miner: Comparable<Miner> {
+class Miner: Comparable<Miner>, Parcelable {
 
     /**
      * The specification of the mining endpoint of the miner.
@@ -39,7 +41,6 @@ class Miner: Comparable<Miner> {
     val entropy: Entropy;
 
     companion object {
-
         private const val MINING_SPECIFICATION_TAG = "miningSpecification"
         private const val URI_TAG = "uri"
         private const val ENTROPY_TAG = "entropy"
@@ -50,6 +51,18 @@ class Miner: Comparable<Miner> {
         private const val SIGNATURE_FOR_DEADLINES = "signatureForDeadlines"
         private const val SIGNATURE_FOR_BLOCKS = "signatureForBlocks"
         private const val PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58 = "publicKeyForSigningBlocksBase58"
+
+        @Suppress("unused") @JvmField
+        val CREATOR = object : Parcelable.Creator<Miner?> {
+
+            override fun createFromParcel(parcel: Parcel): Miner {
+                return Miner(parcel)
+            }
+
+            override fun newArray(size: Int): Array<Miner?> {
+                return arrayOfNulls(size)
+            }
+        }
     }
 
     /**
@@ -63,6 +76,31 @@ class Miner: Comparable<Miner> {
         this.miningSpecification = miningSpecification;
         this.uri = uri;
         this.entropy = entropy;
+    }
+
+    constructor(parcel: Parcel) {
+        val name = parcel.readString()
+        val description = parcel.readString()
+        val chainId = parcel.readString()
+        var hashingForDeadlines = HashingAlgorithms.of(parcel.readString())
+        var signatureForBlocks = SignatureAlgorithms.of(parcel.readString())
+        var signatureForDeadlines = SignatureAlgorithms.of(parcel.readString())
+        var publicKeyForSigningBlocksBase58 = parcel.readString()
+
+        this.miningSpecification = MiningSpecifications.of(
+            name,
+            description,
+            chainId,
+            hashingForDeadlines,
+            signatureForBlocks,
+            signatureForDeadlines,
+            signatureForBlocks.publicKeyFromEncoding(Base58.fromBase58String(publicKeyForSigningBlocksBase58))
+        )
+
+        this.uri = parcel.readSerializable() as URI
+        val entropy = ByteArray(parcel.readInt())
+        parcel.readByteArray(entropy)
+        this.entropy = Entropies.of(entropy)
     }
 
     constructor(parser: XmlPullParser) {
@@ -244,25 +282,33 @@ class Miner: Comparable<Miner> {
         while (depth != 0)
     }
 
+    override fun describeContents(): Int {
+        return 0
+    }
+
+    override fun writeToParcel(out: Parcel, flags: Int) {
+        out.writeString(miningSpecification.name)
+        out.writeString(miningSpecification.description)
+        out.writeString(miningSpecification.chainId)
+        out.writeString(miningSpecification.hashingForDeadlines.name)
+        out.writeString(miningSpecification.signatureForBlocks.name)
+        out.writeString(miningSpecification.signatureForDeadlines.name)
+        out.writeString(miningSpecification.publicKeyForSigningBlocksBase58)
+        out.writeSerializable(uri)
+        out.writeInt(entropy.length())
+        out.writeByteArray(entropy.entropyAsBytes)
+    }
+
     override fun compareTo(other: Miner): Int {
-        var diff = miningSpecification.name.compareTo(other.miningSpecification.name);
-        if (diff != 0)
-            return diff
-
-        diff = uri.compareTo(other.uri)
-        if (diff != 0)
-            return diff
-
-        return entropy.compareTo(other.entropy)
+        return miningSpecification.name.compareTo(other.miningSpecification.name);
     }
 
     override fun equals(other: Any?): Boolean {
-        return other is Miner && miningSpecification.name == other.miningSpecification.name
-                && uri == other.uri && entropy == other.entropy
+        return other is Miner && miningSpecification.name == other.miningSpecification.name;
     }
 
     override fun hashCode(): Int {
-        return entropy.hashCode()
+        return miningSpecification.name.hashCode()
     }
 
     override fun toString(): String {

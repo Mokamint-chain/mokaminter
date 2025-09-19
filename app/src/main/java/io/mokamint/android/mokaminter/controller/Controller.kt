@@ -3,6 +3,8 @@ package io.mokamint.android.mokaminter.controller
 import android.util.Log
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
+import io.mokamint.android.mokaminter.model.Miner
+import io.mokamint.android.mokaminter.model.Miners
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -15,11 +17,23 @@ class Controller(private val mvc: MVC) {
     private val working = AtomicInteger(0)
 
     companion object {
-        private const val TAG = "Controller"
+        private val TAG = Controller::class.simpleName
     }
 
     fun isWorking(): Boolean {
         return working.get() > 0
+    }
+
+    fun requestReloadOfMiners() {
+        safeRunAsIO {
+            mvc.model.set(Miners.load(mvc))
+        }
+    }
+
+    fun requestDelete(miner: Miner) {
+        safeRunAsIO {
+            mvc.model.remove(miner)
+        }
     }
 
     private fun safeRunAsIO(task: () -> Unit) {
@@ -30,7 +44,7 @@ class Controller(private val mvc: MVC) {
             try {
                 task.invoke()
             }
-            catch (t: TimeoutException) {
+            catch (_: TimeoutException) {
                 Log.w(TAG, "The operation timed-out")
                 mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
             }

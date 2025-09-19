@@ -46,7 +46,8 @@ class Mokaminter : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        Log.d(TAG, "$TAG started")
+        applicationContext.controller.requestReloadOfMiners()
+        Log.d(TAG, "$TAG started: requested to reload all miners")
     }
 
     override fun onSupportNavigateUp(): Boolean {

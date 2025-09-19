@@ -1,11 +1,16 @@
 <resources>
     <string name="app_name">Mokaminter</string>
-    <string name="version">Version 1.0 (September XX, 2025)</string>
+    <string name="version">Version 1.0 (October XX, 2025)</string>
     <string name="author">Author: fausto.spoto@mokamint.io</string>
     <string name="nav_header_title">Mokaminter</string>
     <string name="nav_header_subtitle">The mobile miner for Mokamint</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="miners">Miners</string>
     <string name="add_miner">Add miner</string>
+    <string name="deleted_miner">Deleted miner %s</string>
     <string name="operation_timeout">The operation timed-out!</string>
+    <string name="action_show_or_edit_miner">Show or edit</string>
+    <string name="action_show_or_edit_miner_tooltip">Shows and allows one to edit to details of this miner</string>
+    <string name="action_delete_miner">Delete</string>
+    <string name="action_delete_miner_tooltip">Allows one to delete this miner from the list of miners</string>
 </resources>

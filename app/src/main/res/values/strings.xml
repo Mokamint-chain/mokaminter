@@ -7,10 +7,18 @@
     <string name="nav_header_desc">Navigation header</string>
     <string name="miners">Miners</string>
     <string name="add_miner">Add miner</string>
-    <string name="deleted_miner">Deleted miner %s</string>
+    <string name="deleted_miner">Deleted miner %1$s</string>
     <string name="operation_timeout">The operation timed-out!</string>
     <string name="action_show_or_edit_miner">Show or edit</string>
     <string name="action_show_or_edit_miner_tooltip">Shows and allows one to edit to details of this miner</string>
     <string name="action_delete_miner">Delete</string>
     <string name="action_delete_miner_tooltip">Allows one to delete this miner from the list of miners</string>
+    <string name="delete_miner_question">Delete miner?</string>
+    <string name="delete_miner_confirmation_message">Do you really want to delete miner %1$s? Be sure to have saved its key pair or otherwise you won\'t be able to access the balance earned so far.</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="delete">Delete</string>
+    <string name="action_reload_miners">Reload</string>
+    <string name="action_reload_miners_tooltip">Reload the miners\' information</string>
+    <string name="action_add_miner">Add miner</string>
+    <string name="action_add_miner_tooltip">Add a new miner for a mining endpoint</string>
 </resources>

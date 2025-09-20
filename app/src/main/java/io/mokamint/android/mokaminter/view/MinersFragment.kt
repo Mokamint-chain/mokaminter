@@ -4,7 +4,11 @@ import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
 import androidx.annotation.UiThread
 import androidx.appcompat.widget.PopupMenu
@@ -27,6 +31,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setHasOptionsMenu(true)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): android.view.View {
@@ -42,7 +47,39 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         onMinersChanged(getModel().getMiners())
     }
 
+    @Deprecated("Deprecated in Java")
+    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        inflater.inflate(R.menu.miners, menu)
+        super.onCreateOptionsMenu(menu, inflater)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_reload -> {
+                getController().requestReloadOfMiners()
+                true
+            }
+            R.id.action_add_miner -> {
+                //CreateMinerDialogFragment.show(this)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
     @UiThread override fun onMinersChanged(newMiners: Miners) {
+        if (newMiners.stream().count() == 0L) {
+            // if there are no miners, we create a quick
+            // link for the addition of a new miner, as a hint to the user
+            binding.addMiner.visibility = VISIBLE
+            binding.addMiner.setOnClickListener {
+                //CreateMinerDialogFragment.show(this)
+            }
+        }
+        else
+            binding.addMiner.visibility = GONE
+
         adapter.setMiners(newMiners)
     }
 
@@ -84,7 +121,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                         true
                     }
                     R.id.action_delete_miner -> {
-                        getController().requestDelete(miner)
+                        DeleteMinerConfirmationDialogFragment.show(this@MinersFragment, miner)
+                        //getController().requestDelete(miner)
                         true
                     }
                     else -> false

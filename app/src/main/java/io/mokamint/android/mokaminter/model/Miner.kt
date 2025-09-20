@@ -15,15 +15,20 @@ import io.mokamint.miner.api.MiningSpecification
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
-import java.io.IOException
 import java.net.URI
 import java.net.URISyntaxException
 import java.security.NoSuchAlgorithmException
+import java.util.UUID
 
 /**
  * The specification of a miner.
  */
 class Miner: Comparable<Miner>, Parcelable {
+
+    /**
+     * The identifier of the miner.
+     */
+    val uuid: UUID;
 
     /**
      * The specification of the mining endpoint of the miner.
@@ -41,6 +46,7 @@ class Miner: Comparable<Miner>, Parcelable {
     val entropy: Entropy;
 
     companion object {
+        private const val UUID_TAG = "uuid"
         private const val MINING_SPECIFICATION_TAG = "miningSpecification"
         private const val URI_TAG = "uri"
         private const val ENTROPY_TAG = "entropy"
@@ -73,12 +79,15 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param entropy the entropy of the key pair used for signing the deadlines with this miner
      */
     constructor(miningSpecification: MiningSpecification, uri: URI, entropy: Entropy) {
+        this.uuid = UUID.randomUUID();
         this.miningSpecification = miningSpecification;
         this.uri = uri;
         this.entropy = entropy;
     }
 
     constructor(parcel: Parcel) {
+        this.uuid = parcel.readSerializable() as UUID;
+
         val name = parcel.readString()
         val description = parcel.readString()
         val chainId = parcel.readString()
@@ -98,6 +107,7 @@ class Miner: Comparable<Miner>, Parcelable {
         )
 
         this.uri = parcel.readSerializable() as URI
+
         val entropy = ByteArray(parcel.readInt())
         parcel.readByteArray(entropy)
         this.entropy = Entropies.of(entropy)
@@ -105,6 +115,7 @@ class Miner: Comparable<Miner>, Parcelable {
 
     constructor(parser: XmlPullParser) {
         val tag = parser.name
+        var uuid: UUID? = null
         var miningSpecification: MiningSpecification? = null
         var uri: URI? = null
         var entropy: Entropy? = null
@@ -114,6 +125,7 @@ class Miner: Comparable<Miner>, Parcelable {
                 continue
 
             when (parser.name) {
+                UUID_TAG -> uuid = readUUID(parser)
                 MINING_SPECIFICATION_TAG -> miningSpecification = readMiningSpecification(parser)
                 URI_TAG -> uri = readURI(parser)
                 ENTROPY_TAG -> entropy = readEntropy(parser)
@@ -123,6 +135,7 @@ class Miner: Comparable<Miner>, Parcelable {
 
         parser.require(XmlPullParser.END_TAG, null, tag)
 
+        this.uuid = uuid ?: throw XmlPullParserException("Missing UUID in miner")
         this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing mining specification in miner")
         this.uri = uri ?: throw XmlPullParserException("Missing URI in miner")
         this.entropy = entropy ?: throw XmlPullParserException("Missing entropy in miner")
@@ -131,6 +144,9 @@ class Miner: Comparable<Miner>, Parcelable {
     fun writeWith(serializer: XmlSerializer, tag: String) {
         serializer.startTag(null, tag)
 
+        serializer.startTag(null, UUID_TAG)
+        serializer.text(uuid.toString())
+        serializer.endTag(null, UUID_TAG)
         serializer.startTag(null, MINING_SPECIFICATION_TAG)
         serializer.startTag(null, NAME_TAG)
         serializer.text(miningSpecification.name)
@@ -155,13 +171,13 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.endTag(null, PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58)
         serializer.endTag(null, MINING_SPECIFICATION_TAG)
 
-        serializer.startTag(null, ENTROPY_TAG)
-        serializer.text(entropy.toString())
-        serializer.endTag(null, ENTROPY_TAG)
-
         serializer.startTag(null, URI_TAG)
         serializer.text(uri.toString())
         serializer.endTag(null, URI_TAG)
+
+        serializer.startTag(null, ENTROPY_TAG)
+        serializer.text(entropy.toString())
+        serializer.endTag(null, ENTROPY_TAG)
 
         serializer.endTag(null, tag)
     }
@@ -218,6 +234,17 @@ class Miner: Comparable<Miner>, Parcelable {
             return URI(entropy)
         }
         catch (e: URISyntaxException) {
+            throw XmlPullParserException(e.message)
+        }
+    }
+
+    private fun readUUID(parser: XmlPullParser): UUID {
+        val uuid = readText(parser)
+
+        try {
+            return UUID.fromString(uuid)
+        }
+        catch (e: IllegalArgumentException) {
             throw XmlPullParserException(e.message)
         }
     }
@@ -287,6 +314,7 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     override fun writeToParcel(out: Parcel, flags: Int) {
+        out.writeSerializable(uuid)
         out.writeString(miningSpecification.name)
         out.writeString(miningSpecification.description)
         out.writeString(miningSpecification.chainId)
@@ -300,15 +328,19 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     override fun compareTo(other: Miner): Int {
-        return miningSpecification.name.compareTo(other.miningSpecification.name);
+        val diff = miningSpecification.name.compareTo(other.miningSpecification.name)
+        return if (diff != 0)
+            diff
+        else
+            uuid.compareTo(other.uuid)
     }
 
     override fun equals(other: Any?): Boolean {
-        return other is Miner && miningSpecification.name == other.miningSpecification.name;
+        return other is Miner && uuid == other.uuid;
     }
 
     override fun hashCode(): Int {
-        return miningSpecification.name.hashCode()
+        return uuid.hashCode()
     }
 
     override fun toString(): String {

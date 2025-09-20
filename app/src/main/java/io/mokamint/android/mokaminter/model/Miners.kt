@@ -1,5 +1,6 @@
 package io.mokamint.android.mokaminter.model
 
+import android.content.Context
 import android.util.Log
 import android.util.Xml
 import io.hotmoka.crypto.Entropies
@@ -124,6 +125,25 @@ class Miners {
             }
         }
         while (depth != 0)
+    }
+
+    /**
+     * Writes this set of miners in the internal storage of the app, as an XML file.
+     */
+    fun writeIntoInternalStorage() {
+        mvc.openFileOutput(FILENAME, Context.MODE_PRIVATE).use {
+            val serializer = Xml.newSerializer()
+            serializer.setOutput(it, "UTF-8")
+            serializer.startDocument(null, true)
+            serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true)
+
+            serializer.startTag(null, MINERS_TAG)
+            miners.forEach { miner -> miner.writeWith(serializer, MINER_TAG) }
+            serializer.endTag(null, MINERS_TAG)
+
+            serializer.endDocument()
+            serializer.flush()
+        }
     }
 
     /**

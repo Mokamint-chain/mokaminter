@@ -20,6 +20,7 @@ import io.mokamint.android.mokaminter.databinding.FragmentMinersBinding
 import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.Miners
+import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
@@ -61,7 +62,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 true
             }
             R.id.action_add_miner -> {
-                //CreateMinerDialogFragment.show(this)
+                navigate(toAddMiner())
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -73,9 +74,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             // if there are no miners, we create a quick
             // link for the addition of a new miner, as a hint to the user
             binding.addMiner.visibility = VISIBLE
-            binding.addMiner.setOnClickListener {
-                //CreateMinerDialogFragment.show(this)
-            }
+            binding.addMiner.setOnClickListener { navigate(toAddMiner()) }
         }
         else
             binding.addMiner.visibility = GONE
@@ -122,7 +121,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                     }
                     R.id.action_delete_miner -> {
                         DeleteMinerConfirmationDialogFragment.show(this@MinersFragment, miner)
-                        //getController().requestDelete(miner)
                         true
                     }
                     else -> false

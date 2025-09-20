@@ -10,10 +10,15 @@
         android:name="io.mokamint.android.mokaminter.view.MinersFragment"
         android:label="@string/miners"
         tools:layout="@layout/fragment_miners" >
-        <!--<action
-            android:id="@+id/to_show_account"
-            app:destination="@id/show_or_edit_account" />-->
-
+        <action
+            android:id="@+id/to_add_miner"
+            app:destination="@id/add_miner" />
     </fragment>
+
+    <fragment
+        android:id="@+id/add_miner"
+        android:name="io.mokamint.android.mokaminter.view.AddMinerFragment"
+        android:label="@string/add_miner"
+        tools:layout="@layout/fragment_add_miner" />
 
 </navigation>

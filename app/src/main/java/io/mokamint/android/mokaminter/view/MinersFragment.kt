@@ -99,10 +99,18 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
 
             fun bindTo(miner: Miner) {
-                setCardBackground(R.color.purple_200)
                 binding.name.text = miner.miningSpecification.name
                 binding.description.text = miner.miningSpecification.description
-                binding.uri.text = miner.uri.toString()
+                binding.uri.text = getString(R.string.miner_card_uri, miner.uri)
+                binding.plotSize.text = getString(
+                    R.string.miner_card_plot_size,
+                    resources.getQuantityString(R.plurals.nonces, miner.size, miner.size)
+                )
+                binding.publicKey.text = getString(
+                    R.string.miner_card_public_key,
+                    miner.publicKeyBase58,
+                    miner.miningSpecification.signatureForDeadlines.name + ", base58"
+                )
                 binding.menuButton.setOnClickListener { createMenuForMiner(miner) }
             }
 
@@ -125,10 +133,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                     }
                     else -> false
                 }
-            }
-
-            private fun setCardBackground(color: Int) {
-                binding.card.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, color))
             }
         }
 

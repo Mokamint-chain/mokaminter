@@ -78,7 +78,7 @@ class Miners {
                 ed25519,
                 ed25519,
                 ed25519.keyPair.public
-            ), URI.create("ws://panarea.hotmoka.io:8025"), Entropies.random()))
+            ), URI.create("ws://panarea.hotmoka.io:8025"), 1, Entropies.random(), "password1"))
 
             miners.add(Miner(MiningSpecifications.of(
                 "Still Hotmoka",
@@ -88,7 +88,7 @@ class Miners {
                 ed25519,
                 ed25519,
                 ed25519.keyPair.public
-            ), URI.create("ws://panarea.hotmoka.io:8026"), Entropies.random()))
+            ), URI.create("ws://panarea.hotmoka.io:8026"), 2500, Entropies.random(), "password2"))
 
             return miners
         }

@@ -22,11 +22,10 @@
     <string name="action_add_miner">Add miner</string>
     <string name="action_add_miner_tooltip">Add a new miner for a mining endpoint</string>
     <string name="added_miner_uri_default">ws://panarea.hotmoka.io:8025</string>
-    <string name="added_miner_password">Keypair\'s password</string>
-    <string name="add_miner_heading">"Add a new miner for the given mining endpoint URI. A key pair and its password must be provided and will be used to identify the miner in blockchain."</string>
-    <string name="keypair_create_new">Create a new keypair</string>
-    <string name="keypair_import_existing">Import an existing keypair</string>
-    <string name="words_warning">The mnemonic phrase reported below, in its sequential order, together with your chosen password, is the keypair that identifies the miner. Please save this phrase and the password on paper: you will need them if you want to use the same identifier in another app, or if you stop and restart the miner, or if you want to control the coins earned by your mining account. A lost mnemonic or password cannot be recovered.</string>
+    <string name="add_miner_heading">"Add a new miner for the given mining endpoint URI and plot size. A key pair and its password must be provided as well, to identify the miner in blockchain."</string>
+    <string name="keypair_create_new">Create new keypair</string>
+    <string name="keypair_import_existing">Import existing keypair</string>
+    <string name="words_warning">The mnemonic phrase and password below are the keypair that identifies the miner. Please save them on paper: they are needed to import the same identifier in another app, to restart the miner and to control the coins earned by the miner. Lost mnemonic or password cannot be recovered.</string>
     <string name="word1">word 1</string>
     <string name="word2">word 2</string>
     <string name="word3">word 3</string>
@@ -39,4 +38,10 @@
     <string name="word10">word 10</string>
     <string name="word11">word 11</string>
     <string name="word12">word 12</string>
+    <string name="add_miner_size_hint">plot size (number of nonces)</string>
+    <string name="add_miner_uri_hint">URI of the mining endpoint</string>
+    <string name="add_miner_password_hint">Keypair\'s password</string>
+    <string name="miner_card_public_key">public key: %1$s (%2$s)</string>
+    <string name="miner_card_plot_size">plot size: %1$s</string>
+    <string name="miner_card_uri">URI: %1$s</string>
 </resources>

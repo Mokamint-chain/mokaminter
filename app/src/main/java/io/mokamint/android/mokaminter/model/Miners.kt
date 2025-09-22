@@ -3,23 +3,18 @@ package io.mokamint.android.mokaminter.model
 import android.content.Context
 import android.util.Log
 import android.util.Xml
-import io.hotmoka.crypto.Entropies
-import io.hotmoka.crypto.HashingAlgorithms
-import io.hotmoka.crypto.SignatureAlgorithms
 import io.mokamint.android.mokaminter.MVC
-import io.mokamint.miner.MiningSpecifications
 import org.xmlpull.v1.XmlPullParser
 import java.io.FileNotFoundException
-import java.net.URI
 import java.util.TreeSet
 import java.util.stream.Stream
 
 /**
  * The set of miners. They are constrained to have distinct name.
+ *
+ * @param mvc the MVC triple
  */
-class Miners {
-
-    private val mvc: MVC
+class Miners(private val mvc: MVC) {
 
     /**
      * The ordered set of miners contained in this container.
@@ -35,15 +30,6 @@ class Miners {
         private const val MINERS_TAG = "miners"
         private const val MINER_TAG = "miner"
         private val TAG = Miners::class.simpleName
-    }
-
-    /**
-     * Creates an empty set of miners.
-     *
-     * @param mvc the MVC triple
-     */
-    constructor(mvc: MVC) {
-        this.mvc = mvc
     }
 
     /**

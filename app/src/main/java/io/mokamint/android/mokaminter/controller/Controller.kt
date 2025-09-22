@@ -15,6 +15,11 @@ import java.net.URI
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * The controller of the MVC triple.
+ *
+ * @param mvc the MVC triple
+ */
 class Controller(private val mvc: MVC) {
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
@@ -53,7 +58,7 @@ class Controller(private val mvc: MVC) {
                 miningSpecification = it.miningSpecification
             }
 
-            Log.i(TAG, "Fetched the mining specification from $uri:\n$miningSpecification")
+            Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
 
             val miner = Miner(miningSpecification, uri, size, Entropies.of(bip39.bytes), password)
             mvc.model.miners.add(miner)
@@ -76,7 +81,7 @@ class Controller(private val mvc: MVC) {
                 mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
             }
             catch (t: Throwable) {
-                Log.w(TAG, "Background IO action failed", t)
+                Log.w(TAG, "A background IO action failed", t)
                 mainScope.launch { mvc.view?.notifyUser(t.toString()) }
             }
             finally {

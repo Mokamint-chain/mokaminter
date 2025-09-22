@@ -97,6 +97,8 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param uri the URI where the mining endpoint can be contacted
      * @param size the size of the plot of the miner (number of nonces, strictly positive)
      * @param entropy the entropy of the key pair used for signing the deadlines with this miner
+     * @param password the password of the miner; this is not saved anywhere, but only used
+     *                 to create the public key from the entropy
      */
     constructor(miningSpecification: MiningSpecification, uri: URI, size: Int, entropy: Entropy, password: String) {
         this.uuid = UUID.randomUUID()

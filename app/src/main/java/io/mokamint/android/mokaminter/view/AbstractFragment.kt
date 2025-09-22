@@ -18,10 +18,6 @@ abstract class AbstractFragment<V: ViewBinding> : Fragment(), View {
     private var progressBar: ProgressBar? = null
     protected val binding get() = _binding!!
 
-    companion object {
-        private const val TAG = "AbstractFragment"
-    }
-
     @UiThread protected fun setBinding(binding: V) {
         _binding = binding
         progressBar = binding.root.findViewById(R.id.progress_bar)

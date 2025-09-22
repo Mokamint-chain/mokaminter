@@ -1,15 +1,11 @@
 package io.mokamint.android.mokaminter.view
 
 import android.os.Bundle
-import android.text.InputType
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
-import android.widget.CompoundButton
-import android.widget.TextView
 import io.hotmoka.crypto.BIP39Dictionaries
 import io.hotmoka.crypto.BIP39Mnemonics
 import io.hotmoka.crypto.Entropies

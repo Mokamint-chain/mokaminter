@@ -67,16 +67,16 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     @UiThread override fun onMinersReloaded() {
-        adapter.redraw()
+        adapter.update()
     }
 
     @UiThread override fun onMinerDeleted(deleted: Miner) {
-        adapter.redraw()
+        adapter.update()
         notifyUser(getString(R.string.deleted_miner, deleted.miningSpecification.name))
     }
 
     @UiThread override fun onMinerAdded(added: Miner) {
-        adapter.redraw()
+        adapter.update()
         notifyUser(getString(R.string.added_miner, added.miningSpecification.name))
     }
 
@@ -84,7 +84,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private var miners = emptyArray<Miner>()
 
         @SuppressLint("NotifyDataSetChanged")
-        fun redraw() {
+        fun update() {
             miners = getModel().miners.stream().toArray { i -> arrayOfNulls(i) }
 
             if (miners.isEmpty()) {

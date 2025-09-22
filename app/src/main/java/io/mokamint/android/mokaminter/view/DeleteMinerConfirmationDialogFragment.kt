@@ -32,12 +32,10 @@ class DeleteMinerConfirmationDialogFragment: AbstractDialogFragment() {
         return AlertDialog.Builder(context)
             .setTitle(R.string.delete_miner_question)
             .setIcon(R.drawable.ic_delete)
-            .setMessage(
-                getString(
+            .setMessage(getString(
                     R.string.delete_miner_confirmation_message,
                     miner.miningSpecification.name
-                )
-            )
+                ))
             .setNegativeButton(R.string.dismiss) { _, _ -> }
             .setPositiveButton(R.string.delete) { _, _ -> getController().requestDelete(miner) }
             .create()

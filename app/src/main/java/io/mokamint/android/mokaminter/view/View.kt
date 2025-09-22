@@ -2,8 +2,6 @@ package io.mokamint.android.mokaminter.view
 
 import androidx.annotation.UiThread
 import io.mokamint.android.mokaminter.model.Miner
-import io.mokamint.android.mokaminter.model.Miners
-import java.util.stream.Stream
 
 interface View {
 

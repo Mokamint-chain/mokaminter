@@ -35,72 +35,36 @@ class Miners {
         private const val MINERS_TAG = "miners"
         private const val MINER_TAG = "miner"
         private val TAG = Miners::class.simpleName
-
-        /**
-         * Yields an empty set of miners.
-         *
-         * @return the empty set of miners
-         */
-        fun empty(mvc: MVC): Miners {
-            return Miners(mvc)
-        }
-
-        /**
-         * Loads the set of miners from the XML file on disk.
-         *
-         * @return the resulting set of miners
-         */
-        fun load(mvc: MVC): Miners {
-            val miners = Miners(mvc)
-
-            try {
-                mvc.openFileInput(FILENAME).use {
-                    val parser = Xml.newPullParser()
-                    parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-                    parser.setInput(it, null)
-                    parser.nextTag()
-                    miners.readMiners(parser)
-                    Log.i(TAG, "Loaded miners from file $FILENAME")
-                }
-            }
-            catch (_: FileNotFoundException) {
-                // this is fine: initially the file of the miners is missing
-                Log.w(TAG, "Missing file $FILENAME: it will be created from scratch, using an empty set of miners for now")
-            }
-
-            val ed25519 = SignatureAlgorithms.ed25519()
-
-            miners.add(Miner(MiningSpecifications.of(
-                "Hotmoka",
-                "The greatest blockchain in the world",
-                "octopus",
-                HashingAlgorithms.sha256(),
-                ed25519,
-                ed25519,
-                ed25519.keyPair.public
-            ), URI.create("ws://panarea.hotmoka.io:8025"), 1, Entropies.random(), "password1"))
-
-            miners.add(Miner(MiningSpecifications.of(
-                "Still Hotmoka",
-                "Still the greatest blockchain in the world",
-                "mryia",
-                HashingAlgorithms.sha256(),
-                ed25519,
-                ed25519,
-                ed25519.keyPair.public
-            ), URI.create("ws://panarea.hotmoka.io:8026"), 2500, Entropies.random(), "password2"))
-
-            return miners
-        }
     }
 
     /**
-     * Loads the miners from the XML database on disk.
+     * Creates an empty set of miners.
      *
      * @param mvc the MVC triple
      */
-    private constructor(mvc: MVC) {
+    constructor(mvc: MVC) {
         this.mvc = mvc
+    }
+
+    /**
+     * Loads the set of miners from the XML file on disk.
+     */
+    fun reload() {
+        miners.clear()
+
+        try {
+            mvc.openFileInput(FILENAME).use {
+                val parser = Xml.newPullParser()
+                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+                parser.setInput(it, null)
+                parser.nextTag()
+                readMiners(parser)
+            }
+        }
+        catch (_: FileNotFoundException) {
+            // this is fine: initially the file of the miners is missing
+            Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
+        }
     }
 
     private fun readMiners(parser: XmlPullParser) {
@@ -150,19 +114,16 @@ class Miners {
      * Adds the given miner to this container.
      *
      * @param miner the miner to add
-     * @return true if and only if {@code miner} has neen added; a miner will not
-     *         be added if there is already another miner in this container, with the same name
      */
-    fun add(miner: Miner): Boolean {
-        val added = miners.add(miner)
-        if (added)
-            Log.i(TAG, "Added miner $miner")
-        else
-            Log.w(TAG, "Rejected addition of $miner since a miner with the same name already exists")
-
-        return added
+    fun add(miner: Miner) {
+        miners.add(miner)
     }
 
+    /**
+     * Removes the given miner from this container.
+     *
+     * @param miner the miner to remove
+     */
     fun remove(miner: Miner) {
         miners.remove(miner)
     }

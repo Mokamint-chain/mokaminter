@@ -1,7 +1,6 @@
 package io.mokamint.android.mokaminter.view
 
 import android.os.Bundle
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
@@ -33,21 +32,13 @@ class Mokaminter : AppCompatActivity() {
         // passing each menu ID as a set of Ids because each
         // menu should be considered as top level destination
         appBarConfiguration = AppBarConfiguration(
-            setOf(
-                R.id.nav_miners
-            ),
+            setOf(R.id.nav_miners),
             binding.drawerLayout
         )
 
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)
         setupActionBarWithNavController(navController, appBarConfiguration)
         binding.navView.setupWithNavController(navController)
-    }
-
-    override fun onStart() {
-        super.onStart()
-        applicationContext.controller.requestReloadOfMiners()
-        Log.d(TAG, "$TAG started: requested to reload all miners")
     }
 
     override fun onSupportNavigateUp(): Boolean {

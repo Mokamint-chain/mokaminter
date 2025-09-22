@@ -13,8 +13,11 @@ import android.widget.TextView
 import io.hotmoka.crypto.BIP39Dictionaries
 import io.hotmoka.crypto.BIP39Mnemonics
 import io.hotmoka.crypto.Entropies
+import io.hotmoka.crypto.api.BIP39Mnemonic
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.FragmentAddMinerBinding
+import java.net.URI
+import java.net.URISyntaxException
 
 class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
 
@@ -75,6 +78,43 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
     }
 
     private fun addMiner() {
-        notifyUser(getString(R.string.add_miner))
+        val uri: URI
+
+        try {
+            uri = URI(binding.uri.text.toString())
+        }
+        catch (e: URISyntaxException) {
+            notifyUser(getString(R.string.add_miner_message_illegal_uri, e.message))
+            return
+        }
+
+        val size: Int
+        try {
+            size = binding.size.text.toString().toInt()
+        }
+        catch (_: NumberFormatException) {
+            notifyUser(getString(R.string.add_miner_message_specify_positive_plot_size))
+            return
+        }
+
+        if (size < 1) {
+            notifyUser(getString(R.string.add_miner_message_plot_size_must_be_positive))
+            return
+        }
+
+        val bip39: BIP39Mnemonic
+        try {
+            val words = wordsViews.map { view -> view.text.toString() }.toTypedArray()
+            bip39 = BIP39Mnemonics.of(words)
+        }
+        catch (e: IllegalArgumentException) {
+            notifyUser(getString(R.string.add_miner_message_illegal_bip39, e.message))
+            return
+        }
+
+        val password = binding.keypairPassword.text.toString()
+
+        getController().requestCreationOfMiner(uri, size, bip39, password)
+        popBackStack()
     }
 }

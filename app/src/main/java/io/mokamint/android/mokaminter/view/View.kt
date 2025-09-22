@@ -3,6 +3,7 @@ package io.mokamint.android.mokaminter.view
 import androidx.annotation.UiThread
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.Miners
+import java.util.stream.Stream
 
 interface View {
 
@@ -29,11 +30,9 @@ interface View {
     @UiThread fun onBackgroundEnd() {}
 
     /**
-     * Called when the set of miners has changed.
-     *
-     * @param newMiners the new set of miners
+     * Called when the set of miners has been reloaded.
      */
-    @UiThread fun onMinersChanged(newMiners: Miners) {}
+    @UiThread fun onMinersReloaded() {}
 
     /**
      * Called when a miner has been deleted.
@@ -41,4 +40,11 @@ interface View {
      * @param deleted the deleted miner
      */
     @UiThread fun onMinerDeleted(deleted: Miner) {}
+
+    /**
+     * Called when a miner has been added.
+     *
+     * @param added the added miner
+     */
+    @UiThread fun onMinerAdded(added: Miner) {}
 }

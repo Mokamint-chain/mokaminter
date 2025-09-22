@@ -1,7 +1,6 @@
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
-import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -12,14 +11,12 @@ import android.view.View.VISIBLE
 import android.view.ViewGroup
 import androidx.annotation.UiThread
 import androidx.appcompat.widget.PopupMenu
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.FragmentMinersBinding
 import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
-import io.mokamint.android.mokaminter.model.Miners
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
@@ -45,7 +42,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     override fun onStart() {
         super.onStart()
-        onMinersChanged(getModel().getMiners())
+        getController().requestReloadOfMiners()
     }
 
     @Deprecated("Deprecated in Java")
@@ -69,30 +66,36 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
     }
 
-    @UiThread override fun onMinersChanged(newMiners: Miners) {
-        if (newMiners.stream().count() == 0L) {
-            // if there are no miners, we create a quick
-            // link for the addition of a new miner, as a hint to the user
-            binding.addMiner.visibility = VISIBLE
-            binding.addMiner.setOnClickListener { navigate(toAddMiner()) }
-        }
-        else
-            binding.addMiner.visibility = GONE
-
-        adapter.setMiners(newMiners)
+    @UiThread override fun onMinersReloaded() {
+        adapter.redraw()
     }
 
     @UiThread override fun onMinerDeleted(deleted: Miner) {
-        onMinersChanged(getModel().getMiners())
+        adapter.redraw()
         notifyUser(getString(R.string.deleted_miner, deleted.miningSpecification.name))
+    }
+
+    @UiThread override fun onMinerAdded(added: Miner) {
+        adapter.redraw()
+        notifyUser(getString(R.string.added_miner, added.miningSpecification.name))
     }
 
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
         private var miners = emptyArray<Miner>()
 
         @SuppressLint("NotifyDataSetChanged")
-        fun setMiners(miners: Miners) {
-            this.miners = miners.stream().toArray { i -> arrayOfNulls(i) }
+        fun redraw() {
+            miners = getModel().miners.stream().toArray { i -> arrayOfNulls(i) }
+
+            if (miners.isEmpty()) {
+                // if there are no miners, we create a quick
+                // link for the addition of a new miner, as a hint to the user
+                binding.addMiner.visibility = VISIBLE
+                binding.addMiner.setOnClickListener { navigate(toAddMiner()) }
+            }
+            else
+                binding.addMiner.visibility = GONE
+
             notifyDataSetChanged()
         }
 

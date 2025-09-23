@@ -45,4 +45,12 @@ interface View {
      * @param added the added miner
      */
     @UiThread fun onMinerAdded(added: Miner) {}
+
+    /**
+     * Called when the app is ready to create the plot for the
+     * given miner but needs the authorization of the user.
+     *
+     * @param miner the miner for which the plot should be created
+     */
+    @UiThread fun onReadyToCreatePlotFor(miner: Miner) {}
 }

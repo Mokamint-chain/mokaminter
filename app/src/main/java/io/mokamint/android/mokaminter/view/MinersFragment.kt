@@ -107,7 +107,10 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 binding.uri.text = getString(R.string.miner_card_uri, miner.uri)
                 binding.plotSize.text = getString(
                     R.string.miner_card_plot_size,
-                    resources.getQuantityString(R.plurals.nonces, miner.size, miner.size)
+                    resources.getQuantityString(R.plurals.nonces,
+                        // the quantity selector must be an Int but we have a Long here...
+                        if (miner.size > 1000L) 1000 else miner.size.toInt(),
+                        miner.size)
                 )
                 binding.publicKey.text = getString(
                     R.string.miner_card_public_key,

@@ -6,12 +6,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
+import androidx.annotation.UiThread
 import io.hotmoka.crypto.BIP39Dictionaries
 import io.hotmoka.crypto.BIP39Mnemonics
 import io.hotmoka.crypto.Entropies
 import io.hotmoka.crypto.api.BIP39Mnemonic
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.FragmentAddMinerBinding
+import io.mokamint.android.mokaminter.model.Miner
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -84,9 +86,9 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             return
         }
 
-        val size: Int
+        val size: Long
         try {
-            size = binding.size.text.toString().toInt()
+            size = binding.size.text.toString().toLong()
         }
         catch (_: NumberFormatException) {
             notifyUser(getString(R.string.add_miner_message_specify_positive_plot_size))
@@ -111,6 +113,9 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
         val password = binding.keypairPassword.text.toString()
 
         getController().requestCreationOfMiner(uri, size, bip39, password)
-        popBackStack()
+    }
+
+    @UiThread override fun onReadyToCreatePlotFor(miner: Miner) {
+        CreatePlotConfirmationDialogFragment.show(this, miner)
     }
 }

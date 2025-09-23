@@ -18,6 +18,7 @@
     <string name="delete_miner_confirmation_message">Do you really want to delete miner %1$s? Be sure to have already saved its key pair or otherwise you won\'t be able to access the coins earned so far.</string>
     <string name="dismiss">Dismiss</string>
     <string name="delete">Delete</string>
+    <string name="create">Create</string>
     <string name="action_reload_miners">Reload</string>
     <string name="action_reload_miners_tooltip">Reload the miners\' information</string>
     <string name="action_add_miner">Add miner</string>
@@ -49,4 +50,6 @@
     <string name="add_miner_message_plot_size_must_be_positive">The plot size must be strictly positive</string>
     <string name="add_miner_message_illegal_bip39">Illegal mnemonic phrase: %1$s</string>
     <string name="add_miner_message_illegal_uri">Illegal URI: %1$s</string>
+    <string name="create_plot_question">Create plot file?</string>
+    <string name="create_plot_confirmation_message">Do you really want to create a plot file on this device, for a miner called %1$s, containing %2$d nonces, with a total size of %3$.2f gigabytes?</string>
 </resources>

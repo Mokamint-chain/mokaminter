@@ -21,8 +21,8 @@ abstract class AbstractFragment<V: ViewBinding> : Fragment(), View {
     @UiThread protected fun setBinding(binding: V) {
         _binding = binding
         progressBar = binding.root.findViewById(R.id.progress_bar)
-        if (!getController().isWorking())
-            progressBar?.visibility = android.view.View.GONE
+        progressBar?.visibility = if (getController().isWorking())
+            android.view.View.VISIBLE else android.view.View.GONE
     }
 
     @UiThread override fun onStart() {

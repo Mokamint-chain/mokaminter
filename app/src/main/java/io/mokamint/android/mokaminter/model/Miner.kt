@@ -12,6 +12,8 @@ import io.hotmoka.crypto.api.HashingAlgorithm
 import io.hotmoka.crypto.api.SignatureAlgorithm
 import io.mokamint.miner.MiningSpecifications
 import io.mokamint.miner.api.MiningSpecification
+import io.mokamint.nonce.Prologs
+import io.mokamint.nonce.api.Prolog
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
@@ -45,7 +47,7 @@ class Miner: Comparable<Miner>, Parcelable {
     /**
      * The size of the plot of the miner (number of nonces).
      */
-    val size: Int
+    val size: Long
 
     /**
      * The entropy of the key pair used for signing the deadlines with this miner.
@@ -100,7 +102,7 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param password the password of the miner; this is not saved anywhere, but only used
      *                 to create the public key from the entropy
      */
-    constructor(miningSpecification: MiningSpecification, uri: URI, size: Int, entropy: Entropy, password: String) {
+    constructor(miningSpecification: MiningSpecification, uri: URI, size: Long, entropy: Entropy, password: String) {
         this.uuid = UUID.randomUUID()
         this.miningSpecification = miningSpecification
         this.uri = uri
@@ -135,7 +137,7 @@ class Miner: Comparable<Miner>, Parcelable {
         )
 
         this.uri = parcel.readSerializable() as URI
-        this.size = parcel.readInt()
+        this.size = parcel.readLong()
 
         val entropy = ByteArray(parcel.readInt())
         parcel.readByteArray(entropy)
@@ -152,7 +154,7 @@ class Miner: Comparable<Miner>, Parcelable {
         var uuid: UUID? = null
         var miningSpecification: MiningSpecification? = null
         var uri: URI? = null
-        var size: Int = -1
+        var size: Long = -1
         var entropy: Entropy? = null
         var publicKeyBase58: String? = null
 
@@ -239,6 +241,20 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.endTag(null, tag)
     }
 
+    /**
+     * Yields the prolog to use for this miner.
+     */
+    fun getProlog(): Prolog {
+        return Prologs.of(
+            miningSpecification.chainId,
+            miningSpecification.signatureForBlocks,
+            miningSpecification.publicKeyForSigningBlocks,
+            miningSpecification.signatureForDeadlines,
+            publicKey,
+            ByteArray(0) // TODO: allow the specification of extra in the future
+        )
+    }
+
     private fun readMiningSpecification(parser: XmlPullParser): MiningSpecification {
         val tag = parser.name
         var name: String? = null
@@ -307,11 +323,11 @@ class Miner: Comparable<Miner>, Parcelable {
         }
     }
 
-    private fun readSize(parser: XmlPullParser): Int {
+    private fun readSize(parser: XmlPullParser): Long {
         val size = readText(parser)
 
         try {
-            val result = size.toInt()
+            val result = size.toLong()
             if (result > 0)
                 return result
             else
@@ -407,7 +423,7 @@ class Miner: Comparable<Miner>, Parcelable {
         out.writeString(miningSpecification.signatureForDeadlines.name)
         out.writeString(miningSpecification.publicKeyForSigningBlocksBase58)
         out.writeSerializable(uri)
-        out.writeInt(size)
+        out.writeLong(size)
         out.writeInt(entropy.length())
         out.writeByteArray(entropy.entropyAsBytes)
         val publicKeyBytes = miningSpecification.signatureForDeadlines.encodingOf(publicKey)

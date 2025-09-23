@@ -8,10 +8,13 @@ import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.miner.api.MiningSpecification
 import io.mokamint.miner.service.MinerServices
+import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.URI
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -50,7 +53,7 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    fun requestCreationOfMiner(uri: URI, size: Int, bip39: BIP39Mnemonic, password: String) {
+    fun requestCreationOfMiner(uri: URI, size: Long, bip39: BIP39Mnemonic, password: String) {
         safeRunAsIO {
             val miningSpecification: MiningSpecification
 
@@ -61,6 +64,20 @@ class Controller(private val mvc: MVC) {
             Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
 
             val miner = Miner(miningSpecification, uri, size, Entropies.of(bip39.bytes), password)
+            Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
+            mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
+        }
+    }
+
+    fun requestCreationOfPlotFor(miner: Miner) {
+        safeRunAsIO {
+            val filename = "${miner.uuid}.plot"
+            val path = mvc.filesDir.toPath().resolve(filename)
+            Log.i(TAG, "Started creation of file $path for miner ${miner.miningSpecification.name}")
+            Plots.create(path, miner.getProlog(), 0, miner.size, miner.miningSpecification.hashingForDeadlines) { percent ->
+                Log.i(TAG, "processed $percent%")
+            }
+            Log.i(TAG, "Completed creation of file $path for miner ${miner.miningSpecification.name}")
             mvc.model.miners.add(miner)
             mvc.model.miners.writeIntoInternalStorage()
             mainScope.launch { mvc.view?.onMinerAdded(miner) }
@@ -85,8 +102,8 @@ class Controller(private val mvc: MVC) {
                 mainScope.launch { mvc.view?.notifyUser(t.toString()) }
             }
             finally {
-                working.decrementAndGet()
-                mainScope.launch { mvc.view?.onBackgroundEnd() }
+                if (working.decrementAndGet() == 0)
+                    mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
         }
     }

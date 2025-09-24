@@ -27,7 +27,7 @@
         android:layout_marginTop="0dp"
         android:backgroundTint="@color/white"
         android:indeterminate="true"
-        android:indeterminateTint="@color/purple_700"
+        android:indeterminateTint="@color/mokamint_dark"
         android:max="100"
         app:layout_constraintBottom_toTopOf="@+id/recyclerView"
         app:layout_constraintEnd_toEndOf="parent"

@@ -1,7 +1,9 @@
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
+import android.content.res.ColorStateList
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -11,6 +13,7 @@ import android.view.View.VISIBLE
 import android.view.ViewGroup
 import androidx.annotation.UiThread
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.mokamint.android.mokaminter.R
@@ -80,8 +83,23 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         notifyUser(getString(R.string.added_miner, added.miningSpecification.name))
     }
 
+    @UiThread override fun onPlotCreationTick(miner: Miner, percent: Int) {
+        adapter.progress(miner, percent)
+    }
+
+    @UiThread override fun onPlotCreationCompleted(miner: Miner) {
+        adapter.progressStops(miner)
+        adapter.update()
+        notifyUser(getString(R.string.plot_creation_completed, miner.miningSpecification.name))
+    }
+
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
         private var miners = emptyArray<Miner>()
+
+        /**
+         * Keeps track of the progress of the creation of the miners.
+         */
+        private val progress = HashMap<Miner, Int>()
 
         @SuppressLint("NotifyDataSetChanged")
         fun update() {
@@ -99,19 +117,59 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             notifyDataSetChanged()
         }
 
+        fun progress(miner: Miner, percent: Int) {
+            progress.put(miner, percent)
+            // if the miner whose plot is being created is among those in this adapter,
+            // we require a redraw of its item only
+            val pos = miners.indexOf(miner)
+            if (pos >= 0)
+                // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
+                // that does not perform any animation on the updated item; by calling
+                // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
+                notifyItemChanged(pos, percent)
+        }
+
+        fun progressStops(miner: Miner) {
+            progress.remove(miner)
+        }
+
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
 
             fun bindTo(miner: Miner) {
-                binding.name.text = miner.miningSpecification.name
+                if (miner.hasPlotReady) {
+                    binding.card.backgroundTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(context, R.color.mokamint_bright)
+                    )
+                    binding.plotSize.text = getString(
+                        R.string.miner_card_plot_size,
+                        resources.getQuantityString(R.plurals.nonces,
+                            // the quantity selector must be an Int but we have a Long here...
+                            if (miner.size > 1000L) 1000 else miner.size.toInt(),
+                            miner.size)
+                    )
+                }
+                else {
+                    binding.card.backgroundTintList = ColorStateList.valueOf(
+                        ContextCompat.getColor(context, R.color.mokamint_medium)
+                    )
+                    val percent = progress.get(miner)
+                    val done = if (percent == null || percent == 0) 0 else miner.size * percent / 100
+                    binding.plotSize.text = getString(
+                        R.string.miner_card_plot_size_in_progress,
+                        done,
+                        resources.getQuantityString(R.plurals.nonces,
+                            // the quantity selector must be an Int but we have a Long here...
+                            if (miner.size > 1000L) 1000 else miner.size.toInt(),
+                            miner.size)
+                    )
+                }
+                binding.name.text = getString(
+                    R.string.miner_card_name,
+                    miner.miningSpecification.name,
+                    miner.miningSpecification.chainId
+                )
                 binding.description.text = miner.miningSpecification.description
                 binding.uri.text = getString(R.string.miner_card_uri, miner.uri)
-                binding.plotSize.text = getString(
-                    R.string.miner_card_plot_size,
-                    resources.getQuantityString(R.plurals.nonces,
-                        // the quantity selector must be an Int but we have a Long here...
-                        if (miner.size > 1000L) 1000 else miner.size.toInt(),
-                        miner.size)
-                )
                 binding.publicKey.text = getString(
                     R.string.miner_card_public_key,
                     miner.publicKeyBase58,
@@ -152,8 +210,12 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             )
         }
 
-        override fun onBindViewHolder(viewHolder: ViewHolder, i: Int) {
-            viewHolder.bindTo(miners[i])
+        override fun onBindViewHolder(viewHolder: ViewHolder, position: Int, payloads: List<Any?>) {
+            viewHolder.bindTo(miners[position])
+        }
+
+        override fun onBindViewHolder(viewHolder: ViewHolder, position: Int) {
+            viewHolder.bindTo(miners[position])
         }
 
         override fun getItemCount(): Int {

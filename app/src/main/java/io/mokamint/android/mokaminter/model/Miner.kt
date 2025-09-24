@@ -23,6 +23,7 @@ import java.security.NoSuchAlgorithmException
 import java.security.PublicKey
 import java.security.spec.InvalidKeySpecException
 import java.util.UUID
+import kotlin.math.min
 
 /**
  * The specification of a miner.
@@ -64,6 +65,12 @@ class Miner: Comparable<Miner>, Parcelable {
      */
     val publicKeyBase58: String
 
+    /**
+     * True if and only if the plot for this miner has been fully created and is
+     * available in the local storage of the app.
+     */
+    val hasPlotReady: Boolean
+
     companion object {
         private const val UUID_TAG = "uuid"
         private const val MINING_SPECIFICATION_TAG = "miningSpecification"
@@ -78,6 +85,7 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val SIGNATURE_FOR_BLOCKS_TAG = "signatureForBlocks"
         private const val PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58_TAG = "publicKeyForSigningBlocksBase58"
         private const val PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG = "publicKeyForSigningDeadlinesBase58"
+        private const val HAS_PLOT_READY_TAG = "hasPlotReady"
 
         @Suppress("unused") @JvmField
         val CREATOR = object : Parcelable.Creator<Miner?> {
@@ -93,8 +101,9 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     /**
-     * Creates the specification of a miner.
+     * Creates a miner.
      *
+     * @param uuid the identifier to use for the miner
      * @param miningSpecification the specification of the mining endpoint of the miner
      * @param uri the URI where the mining endpoint can be contacted
      * @param size the size of the plot of the miner (number of nonces, strictly positive)
@@ -102,14 +111,15 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param password the password of the miner; this is not saved anywhere, but only used
      *                 to create the public key from the entropy
      */
-    constructor(miningSpecification: MiningSpecification, uri: URI, size: Long, entropy: Entropy, password: String) {
-        this.uuid = UUID.randomUUID()
+    constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, entropy: Entropy, password: String) {
+        this.uuid = uuid
         this.miningSpecification = miningSpecification
         this.uri = uri
         this.size = size
         this.entropy = entropy
         this.publicKey = entropy.keys(password, miningSpecification.signatureForDeadlines).public
         this.publicKeyBase58 = Base58.toBase58String(miningSpecification.signatureForDeadlines.encodingOf(publicKey))
+        this.hasPlotReady = false
 
         if (size < 1)
             throw IllegalArgumentException("The plot size must be a strictly positive number")
@@ -147,6 +157,8 @@ class Miner: Comparable<Miner>, Parcelable {
         parcel.readByteArray(publicKeyForSigningDeadlinesBytes)
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(publicKeyForSigningDeadlinesBytes)
         this.publicKeyBase58 = Base58.toBase58String(publicKeyForSigningDeadlinesBytes)
+
+        this.hasPlotReady = parcel.readByte() != 0.toByte()
     }
 
     constructor(parser: XmlPullParser) {
@@ -154,9 +166,10 @@ class Miner: Comparable<Miner>, Parcelable {
         var uuid: UUID? = null
         var miningSpecification: MiningSpecification? = null
         var uri: URI? = null
-        var size: Long = -1
+        var size: Long? = null
         var entropy: Entropy? = null
         var publicKeyBase58: String? = null
+        var hasPlotReady: Boolean? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG)
@@ -169,6 +182,7 @@ class Miner: Comparable<Miner>, Parcelable {
                 SIZE_TAG -> size = readSize(parser)
                 ENTROPY_TAG -> entropy = readEntropy(parser)
                 PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG -> publicKeyBase58 = readText(parser)
+                HAS_PLOT_READY_TAG -> hasPlotReady = readBoolean(parser)
                 else -> skip(parser)
             }
         }
@@ -178,7 +192,7 @@ class Miner: Comparable<Miner>, Parcelable {
         this.uuid = uuid ?: throw XmlPullParserException("Missing UUID in miner")
         this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing mining specification in miner")
         this.uri = uri ?: throw XmlPullParserException("Missing URI in miner")
-        this.size = if (size > 0) size else throw XmlPullParserException("The plot size must be provided and be positive")
+        this.size = size ?: throw XmlPullParserException("The plot size must be provided and be positive")
         this.entropy = entropy ?: throw XmlPullParserException("Missing entropy in miner")
         this.publicKeyBase58 = Base58.requireBase58(publicKeyBase58, ::XmlPullParserException)
 
@@ -190,6 +204,19 @@ class Miner: Comparable<Miner>, Parcelable {
         catch (e: InvalidKeySpecException) {
             throw XmlPullParserException(e.message)
         }
+
+        this.hasPlotReady = hasPlotReady ?: throw XmlPullParserException("Missing hasPlotReady field in miner")
+    }
+
+    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, entropy: Entropy, publicKey: PublicKey, publicKeyBase58: String, hasPlotReady: Boolean) {
+        this.uuid = uuid
+        this.miningSpecification = miningSpecification
+        this.uri = uri
+        this.size = size
+        this.entropy = entropy
+        this.publicKey = publicKey
+        this.publicKeyBase58 = publicKeyBase58
+        this.hasPlotReady = hasPlotReady
     }
 
     fun writeWith(serializer: XmlSerializer, tag: String) {
@@ -238,7 +265,15 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.text(publicKeyBase58)
         serializer.endTag(null, PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG)
 
+        serializer.startTag(null, HAS_PLOT_READY_TAG)
+        serializer.text(hasPlotReady.toString())
+        serializer.endTag(null, HAS_PLOT_READY_TAG)
+
         serializer.endTag(null, tag)
+    }
+
+    fun withPlotReady(): Miner {
+        return Miner(uuid, miningSpecification, uri, size, entropy, publicKey, publicKeyBase58, true)
     }
 
     /**
@@ -349,6 +384,16 @@ class Miner: Comparable<Miner>, Parcelable {
         }
     }
 
+    private fun readBoolean(parser: XmlPullParser): Boolean {
+        val value = readText(parser)
+
+        return when (value) {
+            "true" -> true
+            "false" -> false
+            else -> throw XmlPullParserException("Expected Boolean")
+        }
+    }
+
     private fun readHashingAlgorithm(parser: XmlPullParser): HashingAlgorithm {
         val signature = readText(parser)
 
@@ -429,6 +474,7 @@ class Miner: Comparable<Miner>, Parcelable {
         val publicKeyBytes = miningSpecification.signatureForDeadlines.encodingOf(publicKey)
         out.writeInt(publicKeyBytes.size)
         out.writeByteArray(publicKeyBytes)
+        out.writeByte(if (hasPlotReady) 1.toByte() else 0.toByte())
     }
 
     override fun compareTo(other: Miner): Int {

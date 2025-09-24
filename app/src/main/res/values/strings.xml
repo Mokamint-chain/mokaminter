@@ -43,8 +43,10 @@
     <string name="add_miner_size_hint">plot size (number of nonces)</string>
     <string name="add_miner_uri_hint">URI of the mining endpoint</string>
     <string name="add_miner_password_hint">Keypair\'s password</string>
+    <string name="miner_card_name">%1$s (%2$s)</string>
     <string name="miner_card_public_key">public key: %1$s (%2$s)</string>
     <string name="miner_card_plot_size">plot size: %1$s</string>
+    <string name="miner_card_plot_size_in_progress">plot size: %1$d/%2$s</string>
     <string name="miner_card_uri">URI: %1$s</string>
     <string name="add_miner_message_specify_positive_plot_size">A positive plot size must be specified</string>
     <string name="add_miner_message_plot_size_must_be_positive">The plot size must be strictly positive</string>
@@ -52,4 +54,5 @@
     <string name="add_miner_message_illegal_uri">Illegal URI: %1$s</string>
     <string name="create_plot_question">Create plot file?</string>
     <string name="create_plot_confirmation_message">Do you really want to create a plot file on this device, for a miner called %1$s, containing %2$d nonces, with a total size of %3$.2f gigabytes?</string>
+    <string name="plot_creation_completed">Completed creation of plot for miner %1$s</string>
 </resources>

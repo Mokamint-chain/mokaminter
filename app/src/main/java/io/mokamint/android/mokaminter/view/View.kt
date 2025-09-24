@@ -53,4 +53,28 @@ interface View {
      * @param miner the miner for which the plot should be created
      */
     @UiThread fun onReadyToCreatePlotFor(miner: Miner) {}
+
+    /**
+     * Called when the creation of the plot for the given miner starts.
+     *
+     * @param miner the miner for which the plot is being created
+     */
+    @UiThread fun onPlotCreationStarted(miner: Miner) {}
+
+    /**
+     * Called when the creation of the plot for the given miner has
+     * reached the given percent. This can be used to provide some feedback
+     * to the user about the progress of the creation.
+     *
+     * @param miner the miner for which the plot is being created
+     * @param percent the percent of creation reached (from 0 to 100 inclusive)
+     */
+    @UiThread fun onPlotCreationTick(miner: Miner, percent: Int) {}
+
+    /**
+     * Called when the creation of the plot for the given miner completes.
+     *
+     * @param miner the miner for which the plot is being created
+     */
+    @UiThread fun onPlotCreationCompleted(miner: Miner) {}
 }

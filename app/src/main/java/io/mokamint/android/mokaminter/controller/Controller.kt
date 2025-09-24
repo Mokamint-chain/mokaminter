@@ -13,8 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.URI
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -46,6 +45,13 @@ class Controller(private val mvc: MVC) {
 
     fun requestDelete(miner: Miner) {
         safeRunAsIO {
+            val filename = "${miner.uuid}.plot"
+
+            if (mvc.deleteFile(filename))
+                Log.i(TAG, "Deleted $filename")
+            else
+                Log.w(TAG, "Failed deleting $filename")
+
             mvc.model.miners.remove(miner)
             mvc.model.miners.writeIntoInternalStorage()
             mainScope.launch { mvc.view?.onMinerDeleted(miner) }
@@ -53,7 +59,14 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    fun requestCreationOfMiner(uri: URI, size: Long, bip39: BIP39Mnemonic, password: String) {
+    /**
+     * Requests the creation of a miner.
+     *
+     * @return the identifier of the miner whose creation starts with this call
+     */
+    fun requestCreationOfMiner(uri: URI, size: Long, bip39: BIP39Mnemonic, password: String): UUID {
+        val uuid = UUID.randomUUID()
+
         safeRunAsIO {
             val miningSpecification: MiningSpecification
 
@@ -63,25 +76,38 @@ class Controller(private val mvc: MVC) {
 
             Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
 
-            val miner = Miner(miningSpecification, uri, size, Entropies.of(bip39.bytes), password)
+            val miner = Miner(uuid, miningSpecification, uri, size, Entropies.of(bip39.bytes), password)
             Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
             mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
         }
+
+        return uuid
     }
 
     fun requestCreationOfPlotFor(miner: Miner) {
         safeRunAsIO {
             val filename = "${miner.uuid}.plot"
             val path = mvc.filesDir.toPath().resolve(filename)
-            Log.i(TAG, "Started creation of file $path for miner ${miner.miningSpecification.name}")
-            Plots.create(path, miner.getProlog(), 0, miner.size, miner.miningSpecification.hashingForDeadlines) { percent ->
-                Log.i(TAG, "processed $percent%")
-            }
-            Log.i(TAG, "Completed creation of file $path for miner ${miner.miningSpecification.name}")
+            Log.i(TAG, "Started creation of $path for miner ${miner.miningSpecification.name}")
+            mainScope.launch { mvc.view?.onPlotCreationStarted(miner) }
+
             mvc.model.miners.add(miner)
             mvc.model.miners.writeIntoInternalStorage()
             mainScope.launch { mvc.view?.onMinerAdded(miner) }
             Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
+
+            Plots.create(path, miner.getProlog(), 0, miner.size, miner.miningSpecification.hashingForDeadlines) { percent ->
+                mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
+                Log.i(TAG, "Created $percent% of plot $path")
+            }
+
+            // we replace the miner with an identical card, but whose "has plot" flag is true
+            mvc.model.miners.remove(miner)
+            mvc.model.miners.add(miner.withPlotReady())
+            mvc.model.miners.writeIntoInternalStorage()
+
+            Log.i(TAG, "Completed creation of $path for miner ${miner.miningSpecification.name}")
+            mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
         }
     }
 

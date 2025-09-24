@@ -16,10 +16,16 @@ import io.mokamint.android.mokaminter.databinding.FragmentAddMinerBinding
 import io.mokamint.android.mokaminter.model.Miner
 import java.net.URI
 import java.net.URISyntaxException
+import java.util.UUID
 
 class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
 
-    private lateinit var wordsViews: Array<AutoCompleteTextView>;
+    private lateinit var wordsViews: Array<AutoCompleteTextView>
+
+    /**
+     * The identifier of the miner whose creation has been already scheduled by this fragment, if any.
+     */
+    private var uuid: UUID? = null
 
     companion object {
         private val TAG = AddMinerFragment::class.simpleName
@@ -112,10 +118,18 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
 
         val password = binding.keypairPassword.text.toString()
 
-        getController().requestCreationOfMiner(uri, size, bip39, password)
+        uuid = getController().requestCreationOfMiner(uri, size, bip39, password)
     }
 
     @UiThread override fun onReadyToCreatePlotFor(miner: Miner) {
-        CreatePlotConfirmationDialogFragment.show(this, miner)
+        // we serve only the miner whose creation we started
+        if (miner.uuid == uuid)
+            CreatePlotConfirmationDialogFragment.show(this, miner)
+    }
+
+    override fun onPlotCreationStarted(miner: Miner) {
+        // we serve only the miner whose creation we started
+        if (miner.uuid == uuid)
+            popBackStack()
     }
 }

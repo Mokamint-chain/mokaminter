@@ -4,6 +4,6 @@
     <gradient
         android:angle="135"
         android:endColor="@color/mokamint_dark"
-        android:startColor="@color/mokamint_brighter"
+        android:startColor="@color/mokamint_medium"
         android:type="linear" />
 </shape>

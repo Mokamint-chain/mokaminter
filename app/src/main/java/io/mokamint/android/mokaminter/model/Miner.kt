@@ -51,11 +51,6 @@ class Miner: Comparable<Miner>, Parcelable {
     val size: Long
 
     /**
-     * The entropy of the key pair used for signing the deadlines with this miner.
-     */
-    val entropy: Entropy
-
-    /**
      * The public key of the miner, derived from entropy, password and signature algorithm for deadlines.
      */
     val publicKey: PublicKey
@@ -76,7 +71,6 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val MINING_SPECIFICATION_TAG = "miningSpecification"
         private const val URI_TAG = "uri"
         private const val SIZE_TAG = "size"
-        private const val ENTROPY_TAG = "entropy"
         private const val NAME_TAG = "name"
         private const val DESCRIPTION_TAG = "description"
         private const val CHAIN_ID_TAG = "chainId"
@@ -107,18 +101,16 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param miningSpecification the specification of the mining endpoint of the miner
      * @param uri the URI where the mining endpoint can be contacted
      * @param size the size of the plot of the miner (number of nonces, strictly positive)
-     * @param entropy the entropy of the key pair used for signing the deadlines with this miner
-     * @param password the password of the miner; this is not saved anywhere, but only used
-     *                 to create the public key from the entropy
+     * @param publicKeyBase58 the Base58-encoded public key of the miner; this ust be a valid key
+     *                        for the signature algorithm for deadlines of the mining specification
      */
-    constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, entropy: Entropy, password: String) {
+    constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKeyBase58: String) {
         this.uuid = uuid
         this.miningSpecification = miningSpecification
         this.uri = uri
         this.size = size
-        this.entropy = entropy
-        this.publicKey = entropy.keys(password, miningSpecification.signatureForDeadlines).public
-        this.publicKeyBase58 = Base58.toBase58String(miningSpecification.signatureForDeadlines.encodingOf(publicKey))
+        this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(Base58.fromBase58String(publicKeyBase58))
+        this.publicKeyBase58 = publicKeyBase58
         this.hasPlotReady = false
 
         if (size < 1)
@@ -149,10 +141,6 @@ class Miner: Comparable<Miner>, Parcelable {
         this.uri = parcel.readSerializable() as URI
         this.size = parcel.readLong()
 
-        val entropy = ByteArray(parcel.readInt())
-        parcel.readByteArray(entropy)
-        this.entropy = Entropies.of(entropy)
-
         var publicKeyForSigningDeadlinesBytes = ByteArray(parcel.readInt())
         parcel.readByteArray(publicKeyForSigningDeadlinesBytes)
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(publicKeyForSigningDeadlinesBytes)
@@ -180,7 +168,6 @@ class Miner: Comparable<Miner>, Parcelable {
                 MINING_SPECIFICATION_TAG -> miningSpecification = readMiningSpecification(parser)
                 URI_TAG -> uri = readURI(parser)
                 SIZE_TAG -> size = readSize(parser)
-                ENTROPY_TAG -> entropy = readEntropy(parser)
                 PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG -> publicKeyBase58 = readText(parser)
                 HAS_PLOT_READY_TAG -> hasPlotReady = readBoolean(parser)
                 else -> skip(parser)
@@ -193,7 +180,6 @@ class Miner: Comparable<Miner>, Parcelable {
         this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing mining specification in miner")
         this.uri = uri ?: throw XmlPullParserException("Missing URI in miner")
         this.size = size ?: throw XmlPullParserException("The plot size must be provided and be positive")
-        this.entropy = entropy ?: throw XmlPullParserException("Missing entropy in miner")
         this.publicKeyBase58 = Base58.requireBase58(publicKeyBase58, ::XmlPullParserException)
 
         try {
@@ -208,12 +194,11 @@ class Miner: Comparable<Miner>, Parcelable {
         this.hasPlotReady = hasPlotReady ?: throw XmlPullParserException("Missing hasPlotReady field in miner")
     }
 
-    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, entropy: Entropy, publicKey: PublicKey, publicKeyBase58: String, hasPlotReady: Boolean) {
+    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKey: PublicKey, publicKeyBase58: String, hasPlotReady: Boolean) {
         this.uuid = uuid
         this.miningSpecification = miningSpecification
         this.uri = uri
         this.size = size
-        this.entropy = entropy
         this.publicKey = publicKey
         this.publicKeyBase58 = publicKeyBase58
         this.hasPlotReady = hasPlotReady
@@ -257,10 +242,6 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.text(size.toString())
         serializer.endTag(null, SIZE_TAG)
 
-        serializer.startTag(null, ENTROPY_TAG)
-        serializer.text(entropy.toString())
-        serializer.endTag(null, ENTROPY_TAG)
-
         serializer.startTag(null, PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG)
         serializer.text(publicKeyBase58)
         serializer.endTag(null, PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG)
@@ -273,7 +254,7 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     fun withPlotReady(): Miner {
-        return Miner(uuid, miningSpecification, uri, size, entropy, publicKey, publicKeyBase58, true)
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, true)
     }
 
     /**
@@ -416,17 +397,6 @@ class Miner: Comparable<Miner>, Parcelable {
         }
     }
 
-    private fun readEntropy(parser: XmlPullParser): Entropy {
-        val entropy = readText(parser)
-
-        try {
-            return Entropies.of(Hex.fromHexString(entropy, ::XmlPullParserException))
-        }
-        catch (e: IllegalArgumentException) {
-            throw XmlPullParserException(e.message)
-        }
-    }
-
     private fun readText(parser: XmlPullParser): String {
         val tag = parser.name
 
@@ -469,8 +439,6 @@ class Miner: Comparable<Miner>, Parcelable {
         out.writeString(miningSpecification.publicKeyForSigningBlocksBase58)
         out.writeSerializable(uri)
         out.writeLong(size)
-        out.writeInt(entropy.length())
-        out.writeByteArray(entropy.entropyAsBytes)
         val publicKeyBytes = miningSpecification.signatureForDeadlines.encodingOf(publicKey)
         out.writeInt(publicKeyBytes.size)
         out.writeByteArray(publicKeyBytes)

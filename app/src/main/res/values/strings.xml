@@ -25,9 +25,9 @@
     <string name="action_add_miner_tooltip">Add a new miner for a mining endpoint</string>
     <string name="added_miner_uri_default">ws://panarea.hotmoka.io:8025</string>
     <string name="add_miner_heading">"Add a new miner for the given mining endpoint URI and plot size. A key pair and its password must be provided as well, to identify the miner in blockchain."</string>
-    <string name="keypair_create_new">Create new keypair</string>
-    <string name="keypair_import_existing">Import existing keypair</string>
-    <string name="words_warning">The mnemonic phrase and password below are the keypair that identifies the miner. Please save them on paper: they are needed to import the same identifier in another app, to restart the miner and to control the coins earned by the miner. Lost mnemonic or password cannot be recovered.</string>
+    <string name="create_new_key">Create new key</string>
+    <string name="import_existing_key">Import existing key</string>
+    <string name="words_warning">The mnemonic phrase and password below are the keypair from which your new key is derived. Please save them on paper: they are needed to import the keypair in another app and to control the coins that will be earned by your new miner. Lost mnemonic or password cannot be recovered.</string>
     <string name="word1">word 1</string>
     <string name="word2">word 2</string>
     <string name="word3">word 3</string>
@@ -50,9 +50,12 @@
     <string name="miner_card_uri">URI: %1$s</string>
     <string name="add_miner_message_specify_positive_plot_size">A positive plot size must be specified</string>
     <string name="add_miner_message_plot_size_must_be_positive">The plot size must be strictly positive</string>
-    <string name="add_miner_message_illegal_bip39">Illegal mnemonic phrase: %1$s</string>
     <string name="add_miner_message_illegal_uri">Illegal URI: %1$s</string>
     <string name="create_plot_question">Create plot file?</string>
     <string name="create_plot_confirmation_message">Do you really want to create a plot file on this device, for a miner called %1$s, containing %2$d nonces, with a total size of %3$.2f gigabytes?</string>
     <string name="plot_creation_completed">Completed creation of plot for miner %1$s</string>
+    <string name="add_miner_public_key_base58_hint">base58-encoded public key</string>
+    <string name="add_miner_message_invalid_public_key">The inserted public key is invalid</string>
+    <string name="add_miner_message_public_key_not_base58">The inserted public key is not in Base58 format</string>
+    <string name="add_miner_bip39_word">%1$d: %2$s</string>
 </resources>

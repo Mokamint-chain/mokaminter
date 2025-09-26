@@ -60,7 +60,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:layout_marginEnd="8dp"
             android:ems="10"
             android:hint="@string/add_miner_size_hint"
@@ -70,6 +70,162 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent" />
+
+        <RadioGroup
+            android:id="@+id/keypair_group"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="8dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/size">
+
+            <RadioButton
+                android:id="@+id/create_new_key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/create_new_key" />
+
+            <RadioButton
+                android:id="@+id/import_existing_key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:checked="false"
+                android:text="@string/import_existing_key" />
+
+        </RadioGroup>
+
+        <EditText
+            android:id="@+id/publicKeyBase58"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            android:ems="10"
+            android:hint="@string/add_miner_public_key_base58_hint"
+            android:inputType="text"
+            android:minHeight="48dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/keypair_group"
+            app:layout_constraintHorizontal_bias="0.5" />
+
+        <TextView
+            android:id="@+id/words_warning"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:text="@string/words_warning"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/publicKeyBase58" />
+
+        <TableLayout
+            android:id="@+id/words"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="16dp"
+            android:stretchColumns="*"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/words_warning"
+            app:layout_constraintHorizontal_bias="0.5" >
+
+            <TableRow>
+
+                <TextView
+                    android:id="@+id/word1"
+                    android:gravity="center"
+                    android:hint="@string/word1"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word2"
+                    android:gravity="center"
+                    android:hint="@string/word2"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word3"
+                    android:gravity="center"
+                    android:hint="@string/word3"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word4"
+                    android:gravity="center"
+                    android:hint="@string/word4"
+                    android:padding="3dp" />
+            </TableRow>
+
+            <TableRow>
+
+                <TextView
+                    android:id="@+id/word5"
+                    android:gravity="center"
+                    android:hint="@string/word5"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word6"
+                    android:gravity="center"
+                    android:hint="@string/word6"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word7"
+                    android:gravity="center"
+                    android:hint="@string/word7"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word8"
+                    android:gravity="center"
+                    android:hint="@string/word8"
+                    android:padding="3dp" />
+            </TableRow>
+
+            <TableRow>
+
+                <TextView
+                    android:id="@+id/word9"
+                    android:gravity="center"
+                    android:hint="@string/word9"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word10"
+                    android:gravity="center"
+                    android:hint="@string/word10"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word11"
+                    android:gravity="center"
+                    android:hint="@string/word11"
+                    android:padding="3dp" />
+
+                <TextView
+                    android:id="@+id/word12"
+                    android:gravity="center"
+                    android:hint="@string/word12"
+                    android:padding="3dp" />
+            </TableRow>
+
+        </TableLayout>
 
         <EditText
             android:id="@+id/keypair_password"
@@ -104,146 +260,6 @@
             app:layout_constraintTop_toTopOf="@id/keypair_password"
             app:layout_constraintVertical_bias="0.48000002"
             app:srcCompat="@drawable/selector_show_password" />
-
-        <RadioGroup
-            android:id="@+id/keypair_group"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="8dp"
-            android:gravity="center"
-            android:orientation="horizontal"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.5"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/size">
-
-            <RadioButton
-                android:id="@+id/keypair_create_new"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/keypair_create_new" />
-
-            <RadioButton
-                android:id="@+id/keypair_import_existing"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="24dp"
-                android:checked="false"
-                android:text="@string/keypair_import_existing" />
-
-        </RadioGroup>
-
-        <TextView
-            android:id="@+id/words_warning"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginEnd="16dp"
-            android:text="@string/words_warning"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/keypair_group" />
-
-        <TableLayout
-            android:id="@+id/words"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:stretchColumns="*"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/words_warning"
-            app:layout_constraintHorizontal_bias="0.5" >
-
-            <TableRow>
-
-                <AutoCompleteTextView
-                    android:id="@+id/word1"
-                    android:gravity="center"
-                    android:hint="@string/word1"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word2"
-                    android:gravity="center"
-                    android:hint="@string/word2"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word3"
-                    android:gravity="center"
-                    android:hint="@string/word3"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word4"
-                    android:gravity="center"
-                    android:hint="@string/word4"
-                    android:padding="3dp" />
-            </TableRow>
-
-            <TableRow>
-
-                <AutoCompleteTextView
-                    android:id="@+id/word5"
-                    android:gravity="center"
-                    android:hint="@string/word5"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word6"
-                    android:gravity="center"
-                    android:hint="@string/word6"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word7"
-                    android:gravity="center"
-                    android:hint="@string/word7"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word8"
-                    android:gravity="center"
-                    android:hint="@string/word8"
-                    android:padding="3dp" />
-            </TableRow>
-
-            <TableRow>
-
-                <AutoCompleteTextView
-                    android:id="@+id/word9"
-                    android:gravity="center"
-                    android:hint="@string/word9"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word10"
-                    android:gravity="center"
-                    android:hint="@string/word10"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word11"
-                    android:gravity="center"
-                    android:hint="@string/word11"
-                    android:padding="3dp" />
-
-                <AutoCompleteTextView
-                    android:id="@+id/word12"
-                    android:gravity="center"
-                    android:hint="@string/word12"
-                    android:padding="3dp" />
-            </TableRow>
-
-        </TableLayout>
 
         <Button
             android:id="@+id/add_miner_button"

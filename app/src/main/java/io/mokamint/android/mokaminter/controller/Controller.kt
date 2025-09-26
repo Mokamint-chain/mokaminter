@@ -1,8 +1,9 @@
 package io.mokamint.android.mokaminter.controller
 
 import android.util.Log
-import io.hotmoka.crypto.Entropies
-import io.hotmoka.crypto.api.BIP39Mnemonic
+import io.hotmoka.crypto.Base58
+import io.hotmoka.crypto.Base58ConversionException
+import io.hotmoka.crypto.api.Entropy
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.URI
+import java.security.spec.InvalidKeySpecException
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
@@ -64,7 +66,7 @@ class Controller(private val mvc: MVC) {
      *
      * @return the identifier of the miner whose creation starts with this call
      */
-    fun requestCreationOfMiner(uri: URI, size: Long, bip39: BIP39Mnemonic, password: String): UUID {
+    fun requestCreationOfMiner(uri: URI, size: Long, entropy: Entropy?, password: String?, publicKeyBase58: String?): UUID {
         val uuid = UUID.randomUUID()
 
         safeRunAsIO {
@@ -76,9 +78,30 @@ class Controller(private val mvc: MVC) {
 
             Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
 
-            val miner = Miner(uuid, miningSpecification, uri, size, Entropies.of(bip39.bytes), password)
-            Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
-            mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
+            val miner: Miner
+            if (publicKeyBase58 != null) {
+                try {
+                    miner = Miner(uuid, miningSpecification, uri, size, publicKeyBase58)
+                    Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
+                    mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
+                }
+                catch (_: InvalidKeySpecException) {
+                    mainScope.launch { mvc.view?.notifyUser(mvc.applicationContext.getString(R.string.add_miner_message_invalid_public_key)) }
+                }
+                catch (_: Base58ConversionException) {
+                    mainScope.launch { mvc.view?.notifyUser(mvc.applicationContext.getString(R.string.add_miner_message_public_key_not_base58)) }
+                }
+            }
+            else if (entropy != null && password != null) {
+                val signatureForDeadlines = miningSpecification.signatureForDeadlines
+                miner = Miner(uuid, miningSpecification, uri, size,
+                    Base58.toBase58String(signatureForDeadlines.encodingOf(entropy.keys(password, signatureForDeadlines).public)))
+                Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
+                mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
+            }
+            else {
+                throw IllegalStateException("Nor a public key nor a mnemonic have been provided")
+            }
         }
 
         return uuid

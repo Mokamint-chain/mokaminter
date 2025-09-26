@@ -187,10 +187,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
             private fun clickListenerForMiner(item: MenuItem, miner: Miner): Boolean {
                 return when (item.itemId) {
-                    R.id.action_show_or_edit_miner -> {
-                        notifyUser("Show or edit miner")
-                        true
-                    }
                     R.id.action_delete_miner -> {
                         DeleteMinerConfirmationDialogFragment.show(this@MinersFragment, miner)
                         true

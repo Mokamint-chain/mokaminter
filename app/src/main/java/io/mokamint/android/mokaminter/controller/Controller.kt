@@ -29,12 +29,37 @@ class Controller(private val mvc: MVC) {
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)
 
+    private var isRequestingBalances: Boolean = false
+
     companion object {
         private val TAG = Controller::class.simpleName
+
+        /**
+         * The interval, in milliseconds, between successive updates
+         * of the balances of the miners.
+         */
+        private const val BALANCES_REQUEST_INTERVAL = 10_000L
     }
 
     fun isWorking(): Boolean {
         return working.get() > 0
+    }
+
+    fun startRequestingBalances() {
+        // we do not require a feedback through a progress bar for this task,
+        // since it is always running
+        safeRunAsIO(false) {
+            isRequestingBalances = true
+
+            while (isRequestingBalances) {
+                Thread.sleep(BALANCES_REQUEST_INTERVAL)
+                MiningService.fetchBalances(mvc)
+            }
+        }
+    }
+
+    fun stopRequestingBalances() {
+        isRequestingBalances = false
     }
 
     fun requestReloadOfMiners() {
@@ -139,8 +164,10 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    private fun safeRunAsIO(task: () -> Unit) {
-        working.incrementAndGet()
+    private fun safeRunAsIO(showProgressBar: Boolean = true, task: () -> Unit) {
+        if (showProgressBar)
+            working.incrementAndGet()
+
         mainScope.launch { mvc.view?.onBackgroundStart() }
 
         ioScope.launch {
@@ -156,10 +183,9 @@ class Controller(private val mvc: MVC) {
                 mainScope.launch { mvc.view?.notifyUser(t.toString()) }
             }
             finally {
-                if (working.decrementAndGet() == 0)
+                if (showProgressBar && working.decrementAndGet() == 0)
                     mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
         }
     }
-
 }

@@ -36,7 +36,9 @@ class Miners(private val mvc: MVC) {
      * Loads the set of miners from the XML file on disk.
      */
     fun reload() {
-        miners.clear()
+        synchronized (miners) {
+            miners.clear()
+        }
 
         try {
             mvc.openFileInput(FILENAME).use {
@@ -88,7 +90,9 @@ class Miners(private val mvc: MVC) {
             serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true)
 
             serializer.startTag(null, MINERS_TAG)
-            miners.forEach { miner -> miner.writeWith(serializer, MINER_TAG) }
+            synchronized (miners) {
+                miners.forEach { miner -> miner.writeWith(serializer, MINER_TAG) }
+            }
             serializer.endTag(null, MINERS_TAG)
 
             serializer.endDocument()
@@ -102,7 +106,9 @@ class Miners(private val mvc: MVC) {
      * @param miner the miner to add
      */
     fun add(miner: Miner) {
-        miners.add(miner)
+        synchronized (miners) {
+            miners.add(miner)
+        }
     }
 
     /**
@@ -111,7 +117,9 @@ class Miners(private val mvc: MVC) {
      * @param miner the miner to remove
      */
     fun remove(miner: Miner) {
-        miners.remove(miner)
+        synchronized (miners) {
+            miners.remove(miner)
+        }
     }
 
     /**
@@ -119,7 +127,9 @@ class Miners(private val mvc: MVC) {
      *
      * @return the miners, in increasing order
      */
-    fun stream(): Stream<Miner> {
-        return miners.stream()
+    fun elements(): Array<Miner> {
+        synchronized (miners) {
+            return miners.stream().toArray { i -> arrayOfNulls(i) }
+        }
     }
 }

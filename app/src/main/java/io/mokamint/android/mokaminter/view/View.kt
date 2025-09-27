@@ -2,6 +2,7 @@ package io.mokamint.android.mokaminter.view
 
 import androidx.annotation.UiThread
 import io.mokamint.android.mokaminter.model.Miner
+import java.math.BigInteger
 
 interface View {
 
@@ -45,6 +46,14 @@ interface View {
      * @param added the added miner
      */
     @UiThread fun onMinerAdded(added: Miner) {}
+
+    /**
+     * Called when the balance of a miner has been updated.
+     *
+     * @param miner the miner whose balance has been updated
+     * @param balance the new balance of the miner (which might well coincide with the old one)
+     */
+    @UiThread fun onBalanceUpdated(miner: Miner, balance: BigInteger) {}
 
     /**
      * Called when the app is ready to create the plot for the

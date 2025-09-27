@@ -68,7 +68,7 @@
             android:layout_marginEnd="8dp"
             android:textAppearance="@style/TextAppearance.AppCompat.Body2"
             android:text="@string/miner_card_uri"
-            app:layout_constraintEnd_toStartOf="@+id/menu_button"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/description" />
 
@@ -80,7 +80,7 @@
             android:layout_marginEnd="8dp"
             android:textAppearance="@style/TextAppearance.AppCompat.Body2"
             android:text="@string/miner_card_public_key"
-            app:layout_constraintEnd_toStartOf="@+id/menu_button"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/uri" />
 
@@ -92,9 +92,21 @@
             android:layout_marginEnd="8dp"
             android:textAppearance="@style/TextAppearance.AppCompat.Body2"
             android:text="@string/miner_card_plot_size"
-            app:layout_constraintEnd_toStartOf="@+id/menu_button"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/public_key" />
+
+        <TextView
+            android:id="@+id/balance"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body2"
+            android:text="@string/miner_card_balance"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/plot_size" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

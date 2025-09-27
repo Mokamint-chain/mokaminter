@@ -58,4 +58,5 @@
     <string name="add_miner_message_invalid_public_key">The inserted public key is invalid</string>
     <string name="add_miner_message_public_key_not_base58">The inserted public key is not in Base58 format</string>
     <string name="add_miner_bip39_word">%1$d: %2$s</string>
+    <string name="miner_card_balance">balance: %1$s</string>
 </resources>

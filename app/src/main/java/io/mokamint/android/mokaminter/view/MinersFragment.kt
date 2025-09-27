@@ -21,6 +21,7 @@ import io.mokamint.android.mokaminter.databinding.FragmentMinersBinding
 import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
+import java.math.BigInteger
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
@@ -46,6 +47,14 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onStart() {
         super.onStart()
         getController().requestReloadOfMiners()
+        // we request to fetch the balances only when the fragment is visible,
+        // to reduce network congestion
+        getController().startRequestingBalances()
+    }
+
+    override fun onStop() {
+        getController().stopRequestingBalances()
+        super.onStop()
     }
 
     @Deprecated("Deprecated in Java")
@@ -84,13 +93,17 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     @UiThread override fun onPlotCreationTick(miner: Miner, percent: Int) {
-        adapter.progress(miner, percent)
+        adapter.progressPlotCreation(miner, percent)
     }
 
     @UiThread override fun onPlotCreationCompleted(miner: Miner) {
         adapter.progressStops(miner)
         adapter.update()
         notifyUser(getString(R.string.plot_creation_completed, miner.miningSpecification.name))
+    }
+
+    @UiThread override fun onBalanceUpdated(miner: Miner, balance: BigInteger) {
+        adapter.updateBalance(miner, balance)
     }
 
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
@@ -103,7 +116,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
         @SuppressLint("NotifyDataSetChanged")
         fun update() {
-            miners = getModel().miners.stream().toArray { i -> arrayOfNulls(i) }
+            miners = getModel().miners.elements()
 
             if (miners.isEmpty()) {
                 // if there are no miners, we create a quick
@@ -117,7 +130,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             notifyDataSetChanged()
         }
 
-        fun progress(miner: Miner, percent: Int) {
+        fun progressPlotCreation(miner: Miner, percent: Int) {
             progress.put(miner, percent)
             // if the miner whose plot is being created is among those in this adapter,
             // we require a redraw of its item only
@@ -127,6 +140,19 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 // that does not perform any animation on the updated item; by calling
                 // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
                 notifyItemChanged(pos, percent)
+        }
+
+        fun updateBalance(miner: Miner, balance: BigInteger) {
+            // if the miner whose balance has been updated is among those in this adapter,
+            // we require a redraw of its item only
+            val pos = miners.indexOf(miner)
+            if (pos >= 0) {
+                // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
+                // that does not perform any animation on the updated item; by calling
+                // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
+                notifyItemChanged(pos, balance)
+                Log.i(TAG, "Updated balance of $miner to $balance")
+            }
         }
 
         fun progressStops(miner: Miner) {

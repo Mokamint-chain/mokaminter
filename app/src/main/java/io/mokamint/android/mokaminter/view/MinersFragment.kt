@@ -44,12 +44,12 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         return binding.root
     }
 
-    override fun onStart() {
-        super.onStart()
+    override fun onResume() {
         getController().requestReloadOfMiners()
         // we request to fetch the balances only when the fragment is visible,
         // to reduce network congestion
         getController().startRequestingBalances()
+        super.onResume()
     }
 
     override fun onStop() {
@@ -102,8 +102,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         notifyUser(getString(R.string.plot_creation_completed, miner.miningSpecification.name))
     }
 
-    @UiThread override fun onBalanceUpdated(miner: Miner, balance: BigInteger) {
-        adapter.updateBalance(miner, balance)
+    @UiThread override fun onBalanceChanged(miner: Miner, newBalance: BigInteger) {
+        adapter.updateBalance(miner, newBalance)
     }
 
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
@@ -132,6 +132,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
         fun progressPlotCreation(miner: Miner, percent: Int) {
             progress.put(miner, percent)
+            miners = getModel().miners.elements()
+
             // if the miner whose plot is being created is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
@@ -143,16 +145,16 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
 
         fun updateBalance(miner: Miner, balance: BigInteger) {
+            miners = getModel().miners.elements()
+
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
-            if (pos >= 0) {
+            if (pos >= 0)
                 // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
                 // that does not perform any animation on the updated item; by calling
                 // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
                 notifyItemChanged(pos, balance)
-                Log.i(TAG, "Updated balance of $miner to $balance")
-            }
         }
 
         fun progressStops(miner: Miner) {
@@ -196,6 +198,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 )
                 binding.description.text = miner.miningSpecification.description
                 binding.uri.text = getString(R.string.miner_card_uri, miner.uri)
+                binding.balance.text = getString(R.string.miner_card_balance, miner.balance)
                 binding.publicKey.text = getString(
                     R.string.miner_card_public_key,
                     miner.publicKeyBase58,

@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import java.math.BigInteger
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeoutException
 import kotlin.jvm.optionals.getOrDefault
 
@@ -83,9 +84,15 @@ class MiningService: Service() {
             ?.getBalance(miner.miningSpecification.signatureForDeadlines, miner.publicKey)
             ?.getOrDefault(BigInteger.ZERO)
 
-        balance?.let {
+        if (balance != null) {
             Log.i(TAG, "Fetched balance of $miner: $balance")
-            mainScope.launch { applicationContext.view?.onBalanceUpdated(miner, balance) }
+
+            if (miner.balance != balance) {
+                applicationContext.model.miners.remove(miner)
+                applicationContext.model.miners.add(miner.withBalance(balance))
+                applicationContext.model.miners.writeIntoInternalStorage()
+                mainScope.launch { applicationContext.view?.onBalanceChanged(miner, balance) }
+            }
         }
     }
 
@@ -137,6 +144,24 @@ class MiningService: Service() {
         }
 
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+        val semaphore = Semaphore(0)
+
+        safeRunInBackground {
+            try {
+                for (miner in activeMiners.keys)
+                    stopMiningWith(miner)
+            }
+            finally {
+                semaphore.release()
+            }
+        }
+
+        semaphore.acquire()
+
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? {

@@ -38,7 +38,7 @@ class Controller(private val mvc: MVC) {
          * The interval, in milliseconds, between successive updates
          * of the balances of the miners.
          */
-        private const val BALANCES_REQUEST_INTERVAL = 10_000L
+        private const val BALANCES_REQUEST_INTERVAL = 600_000L // every 10 minutes
     }
 
     fun isWorking(): Boolean {
@@ -68,6 +68,7 @@ class Controller(private val mvc: MVC) {
             mainScope.launch { mvc.view?.onMinersReloaded() }
             Log.i(TAG, "Reloaded the list of miners")
             MiningService.update(mvc)
+            MiningService.fetchBalances(mvc)
         }
     }
 

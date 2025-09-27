@@ -48,12 +48,12 @@ interface View {
     @UiThread fun onMinerAdded(added: Miner) {}
 
     /**
-     * Called when the balance of a miner has been updated.
+     * Called when the balance of a miner has changed.
      *
-     * @param miner the miner whose balance has been updated
-     * @param balance the new balance of the miner (which might well coincide with the old one)
+     * @param miner the miner whose balance has changed
+     * @param newBalance the new balance of the miner
      */
-    @UiThread fun onBalanceUpdated(miner: Miner, balance: BigInteger) {}
+    @UiThread fun onBalanceChanged(miner: Miner, newBalance: BigInteger) {}
 
     /**
      * Called when the app is ready to create the plot for the

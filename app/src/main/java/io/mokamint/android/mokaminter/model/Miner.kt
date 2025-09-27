@@ -3,11 +3,8 @@ package io.mokamint.android.mokaminter.model
 import android.os.Parcel
 import android.os.Parcelable
 import io.hotmoka.crypto.Base58
-import io.hotmoka.crypto.Entropies
 import io.hotmoka.crypto.HashingAlgorithms
-import io.hotmoka.crypto.Hex
 import io.hotmoka.crypto.SignatureAlgorithms
-import io.hotmoka.crypto.api.Entropy
 import io.hotmoka.crypto.api.HashingAlgorithm
 import io.hotmoka.crypto.api.SignatureAlgorithm
 import io.mokamint.miner.MiningSpecifications
@@ -17,13 +14,13 @@ import io.mokamint.nonce.api.Prolog
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
+import java.math.BigInteger
 import java.net.URI
 import java.net.URISyntaxException
 import java.security.NoSuchAlgorithmException
 import java.security.PublicKey
 import java.security.spec.InvalidKeySpecException
 import java.util.UUID
-import kotlin.math.min
 
 /**
  * The specification of a miner.
@@ -61,6 +58,11 @@ class Miner: Comparable<Miner>, Parcelable {
     val publicKeyBase58: String
 
     /**
+     * The balance of the miner.
+     */
+    val balance: BigInteger
+
+    /**
      * True if and only if the plot for this miner has been fully created and is
      * available in the local storage of the app.
      */
@@ -79,6 +81,7 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val SIGNATURE_FOR_BLOCKS_TAG = "signatureForBlocks"
         private const val PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58_TAG = "publicKeyForSigningBlocksBase58"
         private const val PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG = "publicKeyForSigningDeadlinesBase58"
+        private const val BALANCE_TAG = "balance"
         private const val HAS_PLOT_READY_TAG = "hasPlotReady"
 
         @Suppress("unused") @JvmField
@@ -112,6 +115,7 @@ class Miner: Comparable<Miner>, Parcelable {
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(Base58.fromBase58String(publicKeyBase58))
         this.publicKeyBase58 = publicKeyBase58
         this.hasPlotReady = false
+        this.balance = BigInteger.ZERO
 
         if (size < 1)
             throw IllegalArgumentException("The plot size must be a strictly positive number")
@@ -146,6 +150,8 @@ class Miner: Comparable<Miner>, Parcelable {
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(publicKeyForSigningDeadlinesBytes)
         this.publicKeyBase58 = Base58.toBase58String(publicKeyForSigningDeadlinesBytes)
 
+        this.balance = parcel.readSerializable() as BigInteger
+
         this.hasPlotReady = parcel.readByte() != 0.toByte()
     }
 
@@ -155,8 +161,8 @@ class Miner: Comparable<Miner>, Parcelable {
         var miningSpecification: MiningSpecification? = null
         var uri: URI? = null
         var size: Long? = null
-        var entropy: Entropy? = null
         var publicKeyBase58: String? = null
+        var balance: BigInteger?= null
         var hasPlotReady: Boolean? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
@@ -170,6 +176,7 @@ class Miner: Comparable<Miner>, Parcelable {
                 SIZE_TAG -> size = readSize(parser)
                 PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG -> publicKeyBase58 = readText(parser)
                 HAS_PLOT_READY_TAG -> hasPlotReady = readBoolean(parser)
+                BALANCE_TAG -> balance = readBigInteger(parser)
                 else -> skip(parser)
             }
         }
@@ -191,16 +198,19 @@ class Miner: Comparable<Miner>, Parcelable {
             throw XmlPullParserException(e.message)
         }
 
+        this.balance = balance ?: throw XmlPullParserException("Missing balance in miner")
+
         this.hasPlotReady = hasPlotReady ?: throw XmlPullParserException("Missing hasPlotReady field in miner")
     }
 
-    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKey: PublicKey, publicKeyBase58: String, hasPlotReady: Boolean) {
+    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKey: PublicKey, publicKeyBase58: String, balance: BigInteger, hasPlotReady: Boolean) {
         this.uuid = uuid
         this.miningSpecification = miningSpecification
         this.uri = uri
         this.size = size
         this.publicKey = publicKey
         this.publicKeyBase58 = publicKeyBase58
+        this.balance = balance
         this.hasPlotReady = hasPlotReady
     }
 
@@ -246,6 +256,10 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.text(publicKeyBase58)
         serializer.endTag(null, PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG)
 
+        serializer.startTag(null, BALANCE_TAG)
+        serializer.text(balance.toString())
+        serializer.endTag(null, BALANCE_TAG)
+
         serializer.startTag(null, HAS_PLOT_READY_TAG)
         serializer.text(hasPlotReady.toString())
         serializer.endTag(null, HAS_PLOT_READY_TAG)
@@ -254,7 +268,11 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     fun withPlotReady(): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, true)
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, true)
+    }
+
+    fun withBalance(balance: BigInteger): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady)
     }
 
     /**
@@ -375,6 +393,17 @@ class Miner: Comparable<Miner>, Parcelable {
         }
     }
 
+    private fun readBigInteger(parser: XmlPullParser): BigInteger {
+        val value = readText(parser)
+
+        try {
+            return BigInteger(value)
+        }
+        catch (e: NumberFormatException) {
+            throw XmlPullParserException("Illegal balance: ${e.message}")
+        }
+    }
+
     private fun readHashingAlgorithm(parser: XmlPullParser): HashingAlgorithm {
         val signature = readText(parser)
 
@@ -442,6 +471,7 @@ class Miner: Comparable<Miner>, Parcelable {
         val publicKeyBytes = miningSpecification.signatureForDeadlines.encodingOf(publicKey)
         out.writeInt(publicKeyBytes.size)
         out.writeByteArray(publicKeyBytes)
+        out.writeSerializable(balance)
         out.writeByte(if (hasPlotReady) 1.toByte() else 0.toByte())
     }
 

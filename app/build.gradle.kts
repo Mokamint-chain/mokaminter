@@ -70,8 +70,10 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.io.mokamint.miner.service)
+    implementation(libs.io.mokamint.miner.local)
     implementation(libs.io.mokamint.plotter)
     implementation(libs.io.hotmoka.crypto)
+    implementation(libs.io.hotmoka.marshalling) // forces newer version: remove when imported in mokamint
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

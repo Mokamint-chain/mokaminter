@@ -42,13 +42,7 @@ class Controller(private val mvc: MVC) {
             mvc.model.miners.reload()
             mainScope.launch { mvc.view?.onMinersReloaded() }
             Log.i(TAG, "Reloaded the list of miners")
-
-            MiningTasks.mineWithExactly(
-                // we require to keep (or start) mining with exactly all reloaded miners
-                // that have their plot available
-                mvc.model.miners.stream().filter { miner -> miner.hasPlotReady },
-                mvc
-            )
+            MiningService.update(mvc)
         }
     }
 
@@ -66,7 +60,7 @@ class Controller(private val mvc: MVC) {
             mainScope.launch { mvc.view?.onMinerDeleted(miner) }
             Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
 
-            MiningTasks.stopMiningWith(miner, mvc)
+            MiningService.update(mvc)
         }
     }
 
@@ -141,7 +135,7 @@ class Controller(private val mvc: MVC) {
             Log.i(TAG, "Completed creation of $path for miner ${miner.miningSpecification.name}")
             mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
 
-            MiningTasks.startMiningWith(miner, mvc)
+            MiningService.update(mvc)
         }
     }
 

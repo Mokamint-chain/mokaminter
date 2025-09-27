@@ -10,6 +10,7 @@ activityCompose = "1.11.0"
 composeBom = "2025.09.01"
 mokamint = "1.6.0"
 ioHotmokaCrypto = "1.5.3"
+ioHotmokaMarshalling="1.4.8"
 appcompat = "1.7.1"
 navigationUiKtx = "2.9.5"
 
@@ -29,8 +30,10 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 io-mokamint-miner-service = { group = "io.mokamint", name = "io-mokamint-miner-service", version.ref = "mokamint" }
+io-mokamint-miner-local = { group = "io.mokamint", name = "io-mokamint-miner-local", version.ref = "mokamint" }
 io-mokamint-plotter = { group = "io.mokamint", name = "io-mokamint-plotter", version.ref = "mokamint" }
 io-hotmoka-crypto = { group = "io.hotmoka.crypto", name = "io-hotmoka-crypto", version.ref = "ioHotmokaCrypto" }
+io-hotmoka-marshalling = { group = "io.hotmoka.marshalling", name = "io-hotmoka-marshalling", version.ref = "ioHotmokaMarshalling" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
 androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationUiKtx" }

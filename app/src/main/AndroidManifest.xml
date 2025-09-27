@@ -26,7 +26,7 @@
         </activity>
 
         <service
-            android:name=".controller.MiningTasks"
+            android:name=".controller.MiningService"
             android:enabled="true"
             android:exported="false" >
         </service>

@@ -1,9 +1,9 @@
 package io.mokamint.android.mokaminter.view
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
@@ -12,12 +12,12 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
+import io.mokamint.android.mokaminter.controller.MiningServices
 import io.mokamint.android.mokaminter.databinding.MokaminterBinding
 
 
 class Mokaminter : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
-    private var notificationManager: NotificationManager? = null
 
     companion object {
         private val TAG = Mokaminter::class.simpleName
@@ -46,14 +46,23 @@ class Mokaminter : AppCompatActivity() {
         setupActionBarWithNavController(navController, appBarConfiguration)
         binding.navView.setupWithNavController(navController)
 
-        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(NOTIFICATION_CHANNEL, "Background mining news", NotificationManager.IMPORTANCE_LOW)
-        channel.description = "News about background mining activities"
-        notificationManager?.createNotificationChannel(channel)
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel(NOTIFICATION_CHANNEL, "Background mining updates", NotificationManager.IMPORTANCE_LOW)
+        channel.description = "Updates about background mining activities"
+        notificationManager.createNotificationChannel(channel)
     }
 
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+    }
+
+    override fun onDestroy() {
+        // we distinguish from the case when onDestroy() is called
+        // because of a configuration change
+        if (isFinishing)
+            MiningServices.stop(applicationContext)
+
+        super.onDestroy()
     }
 }

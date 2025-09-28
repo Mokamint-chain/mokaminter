@@ -35,12 +35,6 @@ class Controller(private val mvc: MVC) {
 
     companion object {
         private val TAG = Controller::class.simpleName
-
-        /**
-         * The interval, in milliseconds, between successive updates
-         * of the balances of the miners.
-         */
-        private const val BALANCES_REQUEST_INTERVAL = 10_000L // 600_000L // every 10 minutes
     }
 
     fun isWorking(): Boolean {
@@ -48,21 +42,15 @@ class Controller(private val mvc: MVC) {
     }
 
     fun startRequestingBalances() {
-        // we do not require a feedback through a progress bar for this task,
-        // since it is always running
-        safeRunAsIO(false) {
-            isRequestingBalances = true
-
-            while (isRequestingBalances) {
-                Thread.sleep(BALANCES_REQUEST_INTERVAL)
-                MiningServices.update(mvc)
-                MiningServices.fetchBalances(mvc)
-            }
-        }
+        isRequestingBalances = true
     }
 
     fun stopRequestingBalances() {
         isRequestingBalances = false
+    }
+
+    fun isRequestingBalances(): Boolean {
+        return isRequestingBalances
     }
 
     fun requestReloadOfMiners() {
@@ -71,9 +59,7 @@ class Controller(private val mvc: MVC) {
             mainScope.launch { mvc.view?.onMinersReloaded() }
             Log.i(TAG, "Reloaded the list of miners")
             MiningServices.update(mvc)
-            Log.i(TAG, "Reloaded the list of miners 2")
             MiningServices.fetchBalances(mvc)
-            Log.i(TAG, "Reloaded the list of miners 3")
         }
     }
 

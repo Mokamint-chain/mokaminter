@@ -18,6 +18,7 @@ import java.security.spec.InvalidKeySpecException
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.Volatile
 
 /**
  * The controller of the MVC triple.
@@ -29,6 +30,7 @@ class Controller(private val mvc: MVC) {
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)
 
+    @Volatile
     private var isRequestingBalances: Boolean = false
 
     companion object {
@@ -53,7 +55,8 @@ class Controller(private val mvc: MVC) {
 
             while (isRequestingBalances) {
                 Thread.sleep(BALANCES_REQUEST_INTERVAL)
-                MiningService.fetchBalances(mvc)
+                MiningServices.update(mvc)
+                MiningServices.fetchBalances(mvc)
             }
         }
     }
@@ -67,8 +70,10 @@ class Controller(private val mvc: MVC) {
             mvc.model.miners.reload()
             mainScope.launch { mvc.view?.onMinersReloaded() }
             Log.i(TAG, "Reloaded the list of miners")
-            MiningService.update(mvc)
-            MiningService.fetchBalances(mvc)
+            MiningServices.update(mvc)
+            Log.i(TAG, "Reloaded the list of miners 2")
+            MiningServices.fetchBalances(mvc)
+            Log.i(TAG, "Reloaded the list of miners 3")
         }
     }
 
@@ -86,7 +91,7 @@ class Controller(private val mvc: MVC) {
             mainScope.launch { mvc.view?.onMinerDeleted(miner) }
             Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
 
-            MiningService.update(mvc)
+            MiningServices.update(mvc)
         }
     }
 
@@ -161,7 +166,7 @@ class Controller(private val mvc: MVC) {
             Log.i(TAG, "Completed creation of $path for miner ${miner.miningSpecification.name}")
             mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
 
-            MiningService.update(mvc)
+            MiningServices.update(mvc)
         }
     }
 

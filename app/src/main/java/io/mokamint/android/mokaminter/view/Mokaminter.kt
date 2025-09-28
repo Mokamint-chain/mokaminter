@@ -3,7 +3,6 @@ package io.mokamint.android.mokaminter.view
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
@@ -13,7 +12,6 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
-import io.mokamint.android.mokaminter.controller.MiningService
 import io.mokamint.android.mokaminter.databinding.MokaminterBinding
 
 

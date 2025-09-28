@@ -13,7 +13,7 @@ class MVC: Application() {
     val controller = Controller(this)
 
     companion object {
-        init {
+        init { // TODO: move elsewhere
             // we remove the BC provider, since by default, in Android, it corresponds
             // to the old, internal BC provider
             Security.removeProvider("BC")

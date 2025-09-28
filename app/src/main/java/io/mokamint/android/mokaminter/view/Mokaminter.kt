@@ -1,5 +1,9 @@
 package io.mokamint.android.mokaminter.view
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
@@ -9,13 +13,17 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
+import io.mokamint.android.mokaminter.controller.MiningService
 import io.mokamint.android.mokaminter.databinding.MokaminterBinding
+
 
 class Mokaminter : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
+    private var notificationManager: NotificationManager? = null
 
     companion object {
         private val TAG = Mokaminter::class.simpleName
+        val NOTIFICATION_CHANNEL = TAG
     }
 
     override fun getApplicationContext(): MVC {
@@ -39,10 +47,29 @@ class Mokaminter : AppCompatActivity() {
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)
         setupActionBarWithNavController(navController, appBarConfiguration)
         binding.navView.setupWithNavController(navController)
+
+        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel(NOTIFICATION_CHANNEL, "Background mining news", NotificationManager.IMPORTANCE_LOW)
+        channel.description = "News about background mining activities"
+        notificationManager?.createNotificationChannel(channel)
+
+        // runs a dummy never-ending task, that keeps the service busy and reduces the risk
+        // of the process being killed by the Android runtime
+        MiningService.dummy(applicationContext)
     }
 
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+    }
+
+    fun sendNotification() {
+        val notification = Notification.Builder(this, NOTIFICATION_CHANNEL)
+            .setContentTitle("Mining activity")
+            .setContentText("Mokaminter is mining in the background")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .build()
+
+        notificationManager?.notify(101, notification)
     }
 }

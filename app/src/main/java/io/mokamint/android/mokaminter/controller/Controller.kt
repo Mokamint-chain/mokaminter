@@ -38,7 +38,7 @@ class Controller(private val mvc: MVC) {
          * The interval, in milliseconds, between successive updates
          * of the balances of the miners.
          */
-        private const val BALANCES_REQUEST_INTERVAL = 600_000L // every 10 minutes
+        private const val BALANCES_REQUEST_INTERVAL = 10_000L // 600_000L // every 10 minutes
     }
 
     fun isWorking(): Boolean {

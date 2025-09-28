@@ -1,5 +1,6 @@
 package io.mokamint.android.mokaminter.controller
 
+import android.app.Notification
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
@@ -7,6 +8,8 @@ import android.util.Log
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
+import io.mokamint.android.mokaminter.view.Mokaminter.Companion.NOTIFICATION_CHANNEL
+import io.mokamint.miner.api.ClosedMinerException
 import io.mokamint.miner.local.LocalMiners
 import io.mokamint.miner.service.MinerServices
 import io.mokamint.miner.service.api.MinerService
@@ -23,29 +26,46 @@ import kotlin.jvm.optionals.getOrDefault
 
 class MiningService: Service() {
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     private val mainScope = CoroutineScope(Dispatchers.Main)
 
     /**
      * A map from active miners to their servicing object.
      */
-    private val activeMiners = ConcurrentHashMap<Miner, MinerService>()
+    private val activeServices = ConcurrentHashMap<Miner, MinerService>()
 
     companion object {
         private val TAG = MiningService::class.simpleName
         private const val UPDATE = "update"
         private const val FETCH_BALANCES = "fetch_balances"
 
+        private const val DUMMY = "dummy"
+
         fun update(mvc: MVC) {
             val intent = Intent(UPDATE, null, mvc, MiningService::class.java)
-            mvc.startService(intent)
+            mvc.startForegroundService(intent)
         }
 
         fun fetchBalances(mvc: MVC) {
             val intent = Intent(FETCH_BALANCES, null, mvc, MiningService::class.java)
             mvc.startService(intent)
         }
+
+        fun dummy(mvc: MVC) {
+            val intent = Intent(DUMMY, null, mvc, MiningService::class.java)
+            mvc.startForegroundService(intent)
+        }
+    }
+
+    fun startForegroundMining() {
+        val notification = Notification.Builder(applicationContext, NOTIFICATION_CHANNEL)
+            .setContentTitle("Mining activity")
+            .setContentText("Mokaminter is mining in the background")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .build()
+
+        startForeground(101, notification)
     }
 
     override fun getApplicationContext(): MVC {
@@ -53,7 +73,7 @@ class MiningService: Service() {
     }
 
     private fun startMiningWith(miner: Miner) {
-        activeMiners.computeIfAbsent(miner) { x ->
+        activeServices.computeIfAbsent(miner) { x ->
             val service: MinerService
             val filename = "${miner.uuid}.plot"
             val path = applicationContext.filesDir.toPath().resolve(filename)
@@ -67,32 +87,65 @@ class MiningService: Service() {
             )
 
             service = MinerServices.of(localMiner, miner.uri, 30_000)
+            // if the service gets closed (for instance, for a network disconnection)
+            // we unlink it from the map of active services
+            service.addOnCloseHandler { stopMiningWith(miner) }
             Log.i(TAG, "Started mining with $miner")
             service
         }
     }
 
     private fun stopMiningWith(miner: Miner) {
-        activeMiners.remove(miner)?.let {
+        activeServices.remove(miner)?.let {
             it.close()
             Log.i(TAG, "Stopped mining with $miner")
         }
     }
 
     private fun fetchBalanceOf(miner: Miner) {
-        val balance = activeMiners.get(miner)
-            ?.getBalance(miner.miningSpecification.signatureForDeadlines, miner.publicKey)
-            ?.getOrDefault(BigInteger.ZERO)
+        activeServices[miner]?.let { service ->
+            {
+                var balance: BigInteger? = null
 
-        if (balance != null) {
-            Log.i(TAG, "Fetched balance of $miner: $balance")
+                try {
+                    balance = service.getBalance(
+                        miner.miningSpecification.signatureForDeadlines,
+                        miner.publicKey
+                    )
+                        ?.getOrDefault(BigInteger.ZERO)
+                }
+                catch (_: ClosedMinerException) {
+                    // if the service is closed, we unlink it
+                    stopMiningWith(miner)
+                }
+                catch (_: TimeoutException) {
+                    // if the connection is unresponsive, we closed and unlink the service
+                    stopMiningWith(miner)
+                }
 
-            if (miner.balance != balance) {
-                applicationContext.model.miners.remove(miner)
-                applicationContext.model.miners.add(miner.withBalance(balance))
-                applicationContext.model.miners.writeIntoInternalStorage()
-                mainScope.launch { applicationContext.view?.onBalanceChanged(miner, balance) }
+                if (balance != null) {
+                    Log.i(TAG, "Fetched balance of $miner: $balance")
+
+                    if (miner.balance != balance) {
+                        applicationContext.model.miners.remove(miner)
+                        applicationContext.model.miners.add(miner.withBalance(balance))
+                        applicationContext.model.miners.writeIntoInternalStorage()
+                        mainScope.launch {
+                            applicationContext.view?.onBalanceChanged(
+                                miner,
+                                balance
+                            )
+                        }
+                    }
+                }
             }
+        }
+    }
+
+    private fun dummy() {
+        // for ever sleep
+        while (true) {
+            Thread.sleep(100_000L)
         }
     }
 
@@ -113,9 +166,13 @@ class MiningService: Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "onStartCommand")
+
         if (intent != null) {
             when (intent.action) {
                 UPDATE -> {
+                    startForegroundMining()
+
                     val minersToStart = arrayListOf<Miner>()
                     // we require to keep (or start) mining with exactly all reloaded miners
                     // that have their plot available
@@ -127,7 +184,7 @@ class MiningService: Service() {
                         minerToStart -> safeRunInBackground { startMiningWith(minerToStart) }
                     }
 
-                    activeMiners.keys.forEach {
+                    activeServices.keys.forEach {
                         activeMiner -> if (!minersToStart.contains(activeMiner))
                             safeRunInBackground { stopMiningWith(activeMiner) }
                     }
@@ -136,6 +193,9 @@ class MiningService: Service() {
                     applicationContext.model.miners.elements()
                         .filter { miner -> miner.hasPlotReady }
                         .forEach { miner -> safeRunInBackground { fetchBalanceOf(miner) } }
+                }
+                DUMMY -> {
+                    safeRunInBackground { dummy() }
                 }
                 else -> {
                     Log.w(TAG, "Unexpected intent action ${intent.action}")
@@ -147,11 +207,12 @@ class MiningService: Service() {
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "onDestroy")
         val semaphore = Semaphore(0)
 
         safeRunInBackground {
             try {
-                for (miner in activeMiners.keys)
+                for (miner in activeServices.keys)
                     stopMiningWith(miner)
             }
             finally {

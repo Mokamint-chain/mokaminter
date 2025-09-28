@@ -40,8 +40,6 @@ class MiningService: Service() {
         private const val UPDATE = "update"
         private const val FETCH_BALANCES = "fetch_balances"
 
-        private const val DUMMY = "dummy"
-
         fun update(mvc: MVC) {
             val intent = Intent(UPDATE, null, mvc, MiningService::class.java)
             mvc.startForegroundService(intent)
@@ -50,11 +48,6 @@ class MiningService: Service() {
         fun fetchBalances(mvc: MVC) {
             val intent = Intent(FETCH_BALANCES, null, mvc, MiningService::class.java)
             mvc.startService(intent)
-        }
-
-        fun dummy(mvc: MVC) {
-            val intent = Intent(DUMMY, null, mvc, MiningService::class.java)
-            mvc.startForegroundService(intent)
         }
     }
 
@@ -142,13 +135,6 @@ class MiningService: Service() {
         }
     }
 
-    private fun dummy() {
-        // for ever sleep
-        while (true) {
-            Thread.sleep(100_000L)
-        }
-    }
-
     private fun safeRunInBackground(task: () -> Unit) {
         coroutineScope.launch(Dispatchers.Default) {
             try {
@@ -166,8 +152,6 @@ class MiningService: Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(TAG, "onStartCommand")
-
         if (intent != null) {
             when (intent.action) {
                 UPDATE -> {
@@ -193,9 +177,6 @@ class MiningService: Service() {
                     applicationContext.model.miners.elements()
                         .filter { miner -> miner.hasPlotReady }
                         .forEach { miner -> safeRunInBackground { fetchBalanceOf(miner) } }
-                }
-                DUMMY -> {
-                    safeRunInBackground { dummy() }
                 }
                 else -> {
                     Log.w(TAG, "Unexpected intent action ${intent.action}")

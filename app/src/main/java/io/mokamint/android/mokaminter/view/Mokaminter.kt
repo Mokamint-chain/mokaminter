@@ -55,7 +55,7 @@ class Mokaminter : AppCompatActivity() {
 
         // runs a dummy never-ending task, that keeps the service busy and reduces the risk
         // of the process being killed by the Android runtime
-        MiningService.dummy(applicationContext)
+        //MiningService.dummy(applicationContext)
     }
 
     override fun onSupportNavigateUp(): Boolean {

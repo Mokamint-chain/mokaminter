@@ -50,24 +50,10 @@ class Mokaminter : AppCompatActivity() {
         val channel = NotificationChannel(NOTIFICATION_CHANNEL, "Background mining news", NotificationManager.IMPORTANCE_LOW)
         channel.description = "News about background mining activities"
         notificationManager?.createNotificationChannel(channel)
-
-        // runs a dummy never-ending task, that keeps the service busy and reduces the risk
-        // of the process being killed by the Android runtime
-        //MiningService.dummy(applicationContext)
     }
 
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
-    }
-
-    fun sendNotification() {
-        val notification = Notification.Builder(this, NOTIFICATION_CHANNEL)
-            .setContentTitle("Mining activity")
-            .setContentText("Mokaminter is mining in the background")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .build()
-
-        notificationManager?.notify(101, notification)
     }
 }

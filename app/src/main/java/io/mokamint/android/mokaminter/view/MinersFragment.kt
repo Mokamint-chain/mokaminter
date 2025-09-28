@@ -1,12 +1,8 @@
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.content.Context
 import android.content.res.ColorStateList
 import android.os.Bundle
-import android.util.Log
-import android.app.NotificationManager
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -24,7 +20,6 @@ import io.mokamint.android.mokaminter.databinding.FragmentMinersBinding
 import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
-import io.mokamint.android.mokaminter.view.Mokaminter.Companion.NOTIFICATION_CHANNEL
 import java.math.BigInteger
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {

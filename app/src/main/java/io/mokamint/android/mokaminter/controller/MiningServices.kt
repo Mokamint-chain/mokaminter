@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 import io.mokamint.android.mokaminter.MVC
-import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.view.Mokaminter.Companion.NOTIFICATION_CHANNEL
 import io.mokamint.miner.api.ClosedMinerException
@@ -51,10 +50,10 @@ class MiningServices: Service() {
         }
     }
 
-    private fun notifyForegroundMining() {
+    private fun notifyAboutBackgroundActivity() {
         val notification = Notification.Builder(applicationContext, NOTIFICATION_CHANNEL)
             .setContentTitle("Mining activity")
-            .setContentText("Mokaminter is mining in the background")
+            .setContentText("Mokaminter might be mining in the background")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
 
@@ -134,8 +133,6 @@ class MiningServices: Service() {
     }
 
     private fun update() {
-        notifyForegroundMining()
-
         val minersToStart = arrayListOf<Miner>()
         // we require to keep (or start) mining with exactly all reloaded miners
         // that have their plot available
@@ -143,13 +140,13 @@ class MiningServices: Service() {
             .filter { miner -> miner.hasPlotReady }
             .forEach { miner -> minersToStart.add(miner) }
 
-        minersToStart.forEach {
-                minerToStart -> safeRunInBackground { startMiningWith(minerToStart) }
+        minersToStart.forEach { minerToStart ->
+            safeRunInBackground { startMiningWith(minerToStart) }
         }
 
-        activeServices.keys.forEach {
-                activeMiner -> if (!minersToStart.contains(activeMiner))
-            safeRunInBackground { stopMiningWith(activeMiner) }
+        activeServices.keys.forEach { activeMiner ->
+            if (!minersToStart.contains(activeMiner))
+                safeRunInBackground { stopMiningWith(activeMiner) }
         }
     }
 
@@ -178,7 +175,10 @@ class MiningServices: Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent != null)
             when (intent.action) {
-                UPDATE -> update()
+                UPDATE -> {
+                    notifyAboutBackgroundActivity()
+                    update()
+                }
                 FETCH_BALANCES -> fetchBalances()
                 else -> Log.w(TAG, "Unexpected intent action ${intent.action}")
             }

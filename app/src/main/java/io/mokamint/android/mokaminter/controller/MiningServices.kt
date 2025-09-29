@@ -3,7 +3,6 @@ package io.mokamint.android.mokaminter.controller
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
@@ -38,26 +37,24 @@ class MiningServices: Service() {
      */
     private val activeServices = ConcurrentHashMap<Miner, MinerService?>()
 
-    private var firstIntent: Boolean = true
-
     companion object {
         private val TAG = MiningServices::class.simpleName
         private const val UPDATE = "update"
         private const val FETCH_BALANCES = "fetch_balances"
-
-        /**
-         * The interval, in milliseconds, between successive sanity checks.
-         */
-        private const val SANITY_CHECK_INTERVAL = 600_000L // every 10 minutes
+        private const val SANITY_CHECK = "sanity_check"
 
         fun update(mvc: MVC) {
             val intent = Intent(UPDATE, null, mvc, MiningServices::class.java)
-            Log.d(TAG, "MiningServices.update()")
             mvc.startForegroundService(intent)
         }
 
         fun fetchBalances(mvc: MVC) {
             val intent = Intent(FETCH_BALANCES, null, mvc, MiningServices::class.java)
+            mvc.startForegroundService(intent)
+        }
+
+        fun sanityCheck(mvc: MVC) {
+            val intent = Intent(SANITY_CHECK, null, mvc, MiningServices::class.java)
             mvc.startForegroundService(intent)
         }
 
@@ -67,10 +64,10 @@ class MiningServices: Service() {
         }
     }
 
-    private fun notifyAboutBackgroundActivity() {
+    private fun startBeingForeground() {
         val stopIntent = Intent(applicationContext, StopMiningReceiver::class.java)
         val stopPendingIntent = PendingIntent.getBroadcast(applicationContext, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val action = Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.notification_stop), stopPendingIntent)
+        val action = Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.notification_stop_mining), stopPendingIntent)
             .build()
 
         val notification = Notification.Builder(applicationContext, NOTIFICATION_CHANNEL)
@@ -82,6 +79,10 @@ class MiningServices: Service() {
 
         startForeground(101, notification)
     }
+
+    /*private fun stopBeingForeground() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+    }*/
 
     override fun getApplicationContext(): MVC {
         return super.getApplicationContext() as MVC
@@ -106,6 +107,7 @@ class MiningServices: Service() {
                 // if the service gets closed (for instance, because of a network disconnection)
                 // we unlink it from the map of active services
                 service.addOnCloseHandler { stopMiningWith(miner) }
+                applicationContext.model.miners.startedMiningWith(miner)
                 Log.i(TAG, "Started mining with $miner")
             }
             catch (e: FailedDeploymentException) {
@@ -120,6 +122,7 @@ class MiningServices: Service() {
     private fun stopMiningWith(miner: Miner) {
         activeServices.remove(miner)?.let {
             it.close()
+            applicationContext.model.miners.stoppedMiningWith(miner)
             Log.i(TAG, "Stopped mining with $miner")
         }
     }
@@ -200,34 +203,34 @@ class MiningServices: Service() {
     }
 
     /**
-     * An infinite task that recreates services that have been closed and fetches the balances
+     * Recreates services that have been closed and fetches the balances
      * of the miners, if currently needed by the controller.
      */
-    private fun sanityChecker() {
-        while (true) {
-            Thread.sleep(SANITY_CHECK_INTERVAL)
+    fun sanityCheck() {
+        update()
 
-            update()
-
-            // we only request the balances if the controller asks so,
-            // in order to reduce network congestion
-            if (applicationContext.controller.isRequestingBalances())
-                fetchBalances()
-        }
+        // we only request the balances if the controller asks so,
+        // in order to reduce network congestion
+        if (applicationContext.controller.isRequestingBalances())
+            fetchBalances()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent != null) {
-            notifyAboutBackgroundActivity()
-
-            if (firstIntent) {
-                safeRunInBackground { sanityChecker() }
-                firstIntent = false
-            }
+            Log.d(TAG, "onStartCommand ${intent.action}")
 
             when (intent.action) {
-                UPDATE -> update()
-                FETCH_BALANCES -> fetchBalances()
+                UPDATE -> {
+                    startBeingForeground()
+                    update()
+                }
+                FETCH_BALANCES -> {
+                    startBeingForeground()
+                    fetchBalances()
+                }
+                SANITY_CHECK -> {
+                    sanityCheck()
+                }
             }
         }
 
@@ -250,6 +253,7 @@ class MiningServices: Service() {
         semaphore.acquire()
 
         super.onDestroy()
+        Log.d(TAG, "Service destroyed")
     }
 
     override fun onBind(intent: Intent?): IBinder? {

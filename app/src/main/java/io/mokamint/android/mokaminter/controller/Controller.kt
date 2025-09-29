@@ -25,7 +25,7 @@ import kotlin.concurrent.Volatile
  *
  * @param mvc the MVC triple
  */
-class Controller(private val mvc: MVC) {
+class Controller {
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)
@@ -33,8 +33,27 @@ class Controller(private val mvc: MVC) {
     @Volatile
     private var isRequestingBalances: Boolean = false
 
+    private val mvc: MVC
+
     companion object {
         private val TAG = Controller::class.simpleName
+
+        /**
+         * The interval, in milliseconds, between successive sanity checks.
+         */
+        private const val SANITY_CHECK_INTERVAL = 10_000L //600_000L // every 10 minutes
+    }
+
+    constructor(mvc: MVC) {
+        this.mvc = mvc
+        ioScope.launch { sanityCheck() }
+    }
+
+    private fun sanityCheck() {
+        while (true) {
+            Thread.sleep(SANITY_CHECK_INTERVAL)
+            MiningServices.sanityCheck(mvc)
+        }
     }
 
     fun isWorking(): Boolean {

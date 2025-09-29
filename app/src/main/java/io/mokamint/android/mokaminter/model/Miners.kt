@@ -3,11 +3,14 @@ package io.mokamint.android.mokaminter.model
 import android.content.Context
 import android.util.Log
 import android.util.Xml
+import androidx.annotation.GuardedBy
 import io.mokamint.android.mokaminter.MVC
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.xmlpull.v1.XmlPullParser
 import java.io.FileNotFoundException
 import java.util.TreeSet
-import java.util.stream.Stream
 
 /**
  * The set of miners. They are constrained to have distinct name.
@@ -19,7 +22,13 @@ class Miners(private val mvc: MVC) {
     /**
      * The ordered set of miners contained in this container.
      */
+    @GuardedBy("itself")
     private val miners = TreeSet<Miner>()
+
+    @GuardedBy("itself")
+    private val currentlyUsedForMining = HashSet<Miner>()
+
+    private val mainScope = CoroutineScope(Dispatchers.Main)
 
     companion object {
 
@@ -119,6 +128,28 @@ class Miners(private val mvc: MVC) {
     fun remove(miner: Miner) {
         synchronized (miners) {
             miners.remove(miner)
+        }
+    }
+
+    fun startedMiningWith(miner: Miner) {
+        synchronized (currentlyUsedForMining) {
+            currentlyUsedForMining.add(miner)
+        }
+
+        mainScope.launch { mvc.view?.onStartedMiningWith(miner) }
+    }
+
+    fun stoppedMiningWith(miner: Miner) {
+        synchronized (currentlyUsedForMining) {
+            currentlyUsedForMining.remove(miner)
+        }
+
+        mainScope.launch { mvc.view?.onStoppedMiningWith(miner) }
+    }
+
+    fun isCurrentlyUsedForMining(miner: Miner): Boolean {
+        synchronized (currentlyUsedForMining) {
+            return currentlyUsedForMining.contains(miner)
         }
     }
 

@@ -105,6 +105,16 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         adapter.updateBalance(miner, newBalance)
     }
 
+    @UiThread
+    override fun onStartedMiningWith(miner: Miner) {
+        adapter.updateMiningStatus(miner)
+    }
+
+    @UiThread
+    override fun onStoppedMiningWith(miner: Miner) {
+        adapter.updateMiningStatus(miner)
+    }
+
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
         private var miners = emptyArray<Miner>()
 
@@ -156,6 +166,16 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 notifyItemChanged(pos, balance)
         }
 
+        fun updateMiningStatus(miner: Miner) {
+            miners = getModel().miners.elements()
+
+            // if the miner whose balance has been updated is among those in this adapter,
+            // we require a redraw of its item only
+            val pos = miners.indexOf(miner)
+            if (pos >= 0)
+                notifyItemChanged(pos)
+        }
+
         fun progressStops(miner: Miner) {
             progress.remove(miner)
         }
@@ -163,7 +183,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
 
             fun bindTo(miner: Miner) {
-                if (miner.hasPlotReady) {
+                if (context.applicationContext.model.miners.isCurrentlyUsedForMining(miner)) {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
                         ContextCompat.getColor(context, R.color.mokamint_bright)
                     )

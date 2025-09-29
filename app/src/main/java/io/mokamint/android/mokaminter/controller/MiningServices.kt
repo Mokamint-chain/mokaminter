@@ -1,7 +1,9 @@
 package io.mokamint.android.mokaminter.controller
 
 import android.app.Notification
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
@@ -50,6 +52,7 @@ class MiningServices: Service() {
 
         fun update(mvc: MVC) {
             val intent = Intent(UPDATE, null, mvc, MiningServices::class.java)
+            Log.d(TAG, "MiningServices.update()")
             mvc.startForegroundService(intent)
         }
 
@@ -65,10 +68,16 @@ class MiningServices: Service() {
     }
 
     private fun notifyAboutBackgroundActivity() {
+        val stopIntent = Intent(applicationContext, StopMiningReceiver::class.java)
+        val stopPendingIntent = PendingIntent.getBroadcast(applicationContext, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val action = Notification.Action.Builder(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.notification_stop), stopPendingIntent)
+            .build()
+
         val notification = Notification.Builder(applicationContext, NOTIFICATION_CHANNEL)
-            .setContentTitle("Mining activity")
-            .setContentText("Mokaminter background miner is active")
+            .setContentTitle(getString(R.string.notification_mining_activity))
+            .setContentText(getString(R.string.notification_miner_is_active))
             .setSmallIcon(R.drawable.ic_active_miner)
+            .addAction(action)
             .build()
 
         startForeground(101, notification)

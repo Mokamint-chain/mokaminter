@@ -35,6 +35,10 @@
             android:foregroundServiceType="dataSync" >
         </service>
 
+        <receiver
+            android:name=".controller.StopMiningReceiver">
+        </receiver>
+
     </application>
 
 </manifest>

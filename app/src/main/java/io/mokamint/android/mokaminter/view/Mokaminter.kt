@@ -3,7 +3,6 @@ package io.mokamint.android.mokaminter.view
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Bundle
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
@@ -12,7 +11,6 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
-import io.mokamint.android.mokaminter.controller.MiningServices
 import io.mokamint.android.mokaminter.databinding.MokaminterBinding
 
 
@@ -55,14 +53,5 @@ class Mokaminter : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_content_mokaminter)
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
-    }
-
-    override fun onDestroy() {
-        // we distinguish from the case when onDestroy() is called
-        // because of a configuration change
-        if (isFinishing)
-            MiningServices.stop(applicationContext)
-
-        super.onDestroy()
     }
 }

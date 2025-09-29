@@ -4,13 +4,9 @@
     tools:showIn="navigation_view">
 
     <group android:checkableBehavior="single">
-        <!--<item
-            android:id="@+id/nav_accounts"
-            android:icon="@drawable/ic_accounts"
-            android:title="@string/menu_accounts" />
         <item
             android:id="@+id/settings"
             android:icon="@drawable/ic_settings"
-            android:title="@string/menu_settings" />-->
+            android:title="@string/menu_settings" />
     </group>
 </menu>

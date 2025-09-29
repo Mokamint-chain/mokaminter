@@ -62,4 +62,7 @@
     <string name="notification_mining_activity">Mining activity</string>
     <string name="notification_miner_is_active">The Mokamint miner is active</string>
     <string name="notification_stop">Stop</string>
+    <string name="menu_settings">Settings</string>
+    <string name="source_code_uri">Source code: https://github.com/Mokamint-chain/mokaminter</string>
+    <string name="license">License: Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0.txt)</string>
 </resources>

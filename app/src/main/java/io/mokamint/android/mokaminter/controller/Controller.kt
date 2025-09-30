@@ -12,6 +12,7 @@ import io.mokamint.miner.service.MinerServices
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
@@ -26,14 +27,16 @@ import kotlin.concurrent.Volatile
  * @param mvc the MVC triple
  */
 class Controller {
+    private val mvc: MVC
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)
 
     @Volatile
-    private var isRequestingBalances: Boolean = false
+    private var isRequestingBalances = false
 
-    private val mvc: MVC
+    @Volatile
+    private var isMiningPaused = false
 
     companion object {
         private val TAG = Controller::class.simpleName
@@ -41,7 +44,7 @@ class Controller {
         /**
          * The interval, in milliseconds, between successive sanity checks.
          */
-        private const val SANITY_CHECK_INTERVAL = 10_000L //600_000L // every 10 minutes
+        private const val SANITY_CHECK_INTERVAL = 600_000L // every 10 minutes
     }
 
     constructor(mvc: MVC) {
@@ -49,15 +52,46 @@ class Controller {
         ioScope.launch { sanityCheck() }
     }
 
+    /**
+     * Recreates services that have been closed and fetches the balances
+     * of the miners, if currently needed by the controller.
+     */
     private fun sanityCheck() {
         while (true) {
+            Log.d(TAG, "sanityCheck")
             Thread.sleep(SANITY_CHECK_INTERVAL)
-            MiningServices.sanityCheck(mvc)
+
+            if (!isMiningPaused)
+                MiningServices.update(mvc)
+
+            // we only request the balances if the controller asks so,
+            // in order to reduce network congestion
+            if (isRequestingBalances())
+                MiningServices.fetchBalances(mvc)
         }
     }
 
     fun isWorking(): Boolean {
         return working.get() > 0
+    }
+
+    fun isMiningPaused(): Boolean {
+        return isMiningPaused
+    }
+
+    fun pauseMining() {
+        isMiningPaused = true
+        mvc.view?.onMiningPaused()
+    }
+
+    fun requestPauseMining() {
+        MiningServices.stop(mvc)
+    }
+
+    fun requestUnpauseMining() {
+        isMiningPaused = false
+        MiningServices.update(mvc)
+        mvc.view?.onMiningUnpaused()
     }
 
     fun startRequestingBalances() {

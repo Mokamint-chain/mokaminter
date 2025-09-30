@@ -21,6 +21,7 @@ import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
 import java.math.BigInteger
+import androidx.core.view.get
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
@@ -58,8 +59,21 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     @Deprecated("Deprecated in Java")
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.miners, menu)
+        inflater.inflate(R.menu.miners_fragment, menu)
+        updateMenu(menu)
         super.onCreateOptionsMenu(menu, inflater)
+    }
+
+    private fun updateMenu(menu: Menu) {
+        val isMiningPaused = getController().isMiningPaused()
+        menu[1].isEnabled = !isMiningPaused
+        menu[2].isEnabled = isMiningPaused
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        super.onPrepareOptionsMenu(menu)
+        updateMenu(menu)
     }
 
     @Deprecated("Deprecated in Java")
@@ -71,6 +85,14 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             }
             R.id.action_add_miner -> {
                 navigate(toAddMiner())
+                true
+            }
+            R.id.action_pause_mining -> {
+                getController().requestPauseMining()
+                true
+            }
+            R.id.action_unpause_mining -> {
+                getController().requestUnpauseMining()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -113,6 +135,14 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     @UiThread
     override fun onStoppedMiningWith(miner: Miner) {
         adapter.updateMiningStatus(miner)
+    }
+
+    override fun onMiningPaused() {
+        context.invalidateOptionsMenu()
+    }
+
+    override fun onMiningUnpaused() {
+        context.invalidateOptionsMenu()
     }
 
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {

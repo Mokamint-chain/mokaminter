@@ -61,8 +61,10 @@
     <string name="miner_card_balance">balance: %1$s</string>
     <string name="notification_mining_activity">Mining activity</string>
     <string name="notification_miner_is_active">The Mokamint miner is active</string>
-    <string name="notification_stop_mining">Stop mining</string>
+    <string name="notification_pause_mining">Pause mining</string>
     <string name="menu_settings">Settings</string>
     <string name="source_code_uri">Source code: https://github.com/Mokamint-chain/mokaminter</string>
     <string name="license">License: https://www.apache.org/licenses/LICENSE-2.0.txt (Apache 2.0)</string>
+    <string name="miners_fragment_menu_pause_mining">Pause mining</string>
+    <string name="miners_fragment_menu_unpause_mining">Unpause mining</string>
 </resources>

@@ -9,8 +9,22 @@
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_add_miner"
+        android:id="@+id/action_pause_mining"
         android:orderInCategory="101"
+        android:icon="@drawable/ic_add"
+        android:title="@string/miners_fragment_menu_pause_mining"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_unpause_mining"
+        android:orderInCategory="102"
+        android:icon="@drawable/ic_add"
+        android:title="@string/miners_fragment_menu_unpause_mining"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_add_miner"
+        android:orderInCategory="103"
         android:icon="@drawable/ic_add"
         android:title="@string/action_add_miner"
         app:showAsAction="never" />

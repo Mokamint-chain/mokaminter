@@ -8,6 +8,7 @@ import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.TextView
 import androidx.annotation.UiThread
+import androidx.preference.PreferenceManager
 import io.hotmoka.crypto.BIP39Dictionaries
 import io.hotmoka.crypto.BIP39Mnemonics
 import io.hotmoka.crypto.Entropies
@@ -153,6 +154,12 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
 
         if (size < 1) {
             notifyUser(getString(R.string.add_miner_message_plot_size_must_be_positive))
+            return
+        }
+
+        val maxSize = PreferenceManager.getDefaultSharedPreferences(context).getString("max_plot_size", "1000")!!.toInt()
+        if (size > maxSize) {
+            notifyUser(getString(R.string.add_miner_message_plot_size_limited, maxSize))
             return
         }
 

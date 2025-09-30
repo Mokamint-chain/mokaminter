@@ -36,7 +36,7 @@ class Mokaminter : AppCompatActivity() {
         // passing each menu ID as a set of Ids because each
         // menu should be considered as top level destination
         appBarConfiguration = AppBarConfiguration(
-            setOf(R.id.nav_miners),
+            setOf(R.id.nav_miners, R.id.nav_settings),
             binding.drawerLayout
         )
 
@@ -45,8 +45,8 @@ class Mokaminter : AppCompatActivity() {
         binding.navView.setupWithNavController(navController)
 
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(NOTIFICATION_CHANNEL, "Background mining updates", NotificationManager.IMPORTANCE_LOW)
-        channel.description = "Updates about background mining activities"
+        val channel = NotificationChannel(NOTIFICATION_CHANNEL, getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW)
+        channel.description = getString(R.string.notification_channel_description)
         notificationManager.createNotificationChannel(channel)
     }
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<PreferenceScreen
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:defaultValue="@string/default_max_plot_size"
+        app:key="max_plot_size"
+        app:title="@string/max_plot_size"
+        app:useSimpleSummaryProvider="true" />
+
+</PreferenceScreen>

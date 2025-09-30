@@ -59,7 +59,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     @Deprecated("Deprecated in Java")
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.miners_fragment, menu)
+        inflater.inflate(R.menu.fragment_miners, menu)
         updateMenu(menu)
         super.onCreateOptionsMenu(menu, inflater)
     }

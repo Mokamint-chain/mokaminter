@@ -72,8 +72,8 @@
             app:layout_constraintStart_toStartOf="parent" />
 
         <RadioGroup
-            android:id="@+id/keypair_group"
-            android:layout_width="wrap_content"
+            android:id="@+id/key_selection"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_marginStart="8dp"
@@ -87,19 +87,27 @@
             app:layout_constraintTop_toBottomOf="@id/size">
 
             <RadioButton
-                android:id="@+id/create_new_key"
+                android:id="@+id/create_key"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:text="@string/create_new_key" />
+                android:text="@string/create_key" />
 
             <RadioButton
-                android:id="@+id/import_existing_key"
+                android:id="@+id/use_existing_key"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
                 android:checked="false"
-                android:text="@string/import_existing_key" />
+                android:text="@string/use_existing_key" />
+
+            <RadioButton
+                android:id="@+id/use_existing_key_pair"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:checked="false"
+                android:text="@string/use_existing_key_pair" />
 
         </RadioGroup>
 
@@ -116,11 +124,11 @@
             android:minHeight="48dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/keypair_group"
+            app:layout_constraintTop_toBottomOf="@id/key_selection"
             app:layout_constraintHorizontal_bias="0.5" />
 
         <TextView
-            android:id="@+id/words_warning"
+            android:id="@+id/mnemonics_info"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
@@ -141,94 +149,169 @@
             android:stretchColumns="*"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/words_warning"
+            app:layout_constraintTop_toBottomOf="@id/mnemonics_info"
             app:layout_constraintHorizontal_bias="0.5" >
 
-            <TableRow>
+            <TableRow android:id="@+id/rowWords1" >
 
                 <TextView
                     android:id="@+id/word1"
                     android:gravity="center"
-                    android:hint="@string/word1"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word2"
                     android:gravity="center"
-                    android:hint="@string/word2"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word3"
                     android:gravity="center"
-                    android:hint="@string/word3"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word4"
                     android:gravity="center"
-                    android:hint="@string/word4"
                     android:padding="3dp" />
+
             </TableRow>
 
-            <TableRow>
+            <TableRow android:id="@+id/rowInsertWords1" >
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord1"
+                    android:gravity="center"
+                    android:hint="@string/word1"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord2"
+                    android:gravity="center"
+                    android:hint="@string/word2"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord3"
+                    android:gravity="center"
+                    android:hint="@string/word3"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord4"
+                    android:gravity="center"
+                    android:hint="@string/word4"
+                    android:padding="3dp" />
+
+            </TableRow>
+
+            <TableRow android:id="@+id/rowWords2" >
 
                 <TextView
                     android:id="@+id/word5"
                     android:gravity="center"
-                    android:hint="@string/word5"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word6"
                     android:gravity="center"
-                    android:hint="@string/word6"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word7"
                     android:gravity="center"
-                    android:hint="@string/word7"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word8"
                     android:gravity="center"
-                    android:hint="@string/word8"
                     android:padding="3dp" />
+
             </TableRow>
 
-            <TableRow>
+            <TableRow android:id="@+id/rowInsertWords2" >
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord5"
+                    android:gravity="center"
+                    android:hint="@string/word5"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord6"
+                    android:gravity="center"
+                    android:hint="@string/word6"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord7"
+                    android:gravity="center"
+                    android:hint="@string/word7"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord8"
+                    android:gravity="center"
+                    android:hint="@string/word8"
+                    android:padding="3dp" />
+
+            </TableRow>
+
+            <TableRow android:id="@+id/rowWords3" >
 
                 <TextView
                     android:id="@+id/word9"
                     android:gravity="center"
-                    android:hint="@string/word9"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word10"
                     android:gravity="center"
-                    android:hint="@string/word10"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word11"
                     android:gravity="center"
-                    android:hint="@string/word11"
                     android:padding="3dp" />
 
                 <TextView
                     android:id="@+id/word12"
                     android:gravity="center"
+                    android:padding="3dp" />
+
+            </TableRow>
+
+            <TableRow android:id="@+id/rowInsertWords3" >
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord9"
+                    android:gravity="center"
+                    android:hint="@string/word9"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord10"
+                    android:gravity="center"
+                    android:hint="@string/word10"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord11"
+                    android:gravity="center"
+                    android:hint="@string/word11"
+                    android:padding="3dp" />
+
+                <AutoCompleteTextView
+                    android:id="@+id/insertWord12"
+                    android:gravity="center"
                     android:hint="@string/word12"
                     android:padding="3dp" />
+
             </TableRow>
 
         </TableLayout>
 
         <EditText
-            android:id="@+id/keypair_password"
+            android:id="@+id/key_pair_password"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
@@ -252,12 +335,12 @@
             android:layout_marginEnd="8dp"
             android:background="@color/white"
             android:scaleType="centerInside"
-            app:controls="@+id/keypair_password"
-            app:layout_constraintBottom_toBottomOf="@+id/keypair_password"
+            app:controls="@+id/key_pair_password"
+            app:layout_constraintBottom_toBottomOf="@+id/key_pair_password"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
-            app:layout_constraintStart_toEndOf="@id/keypair_password"
-            app:layout_constraintTop_toTopOf="@id/keypair_password"
+            app:layout_constraintStart_toEndOf="@id/key_pair_password"
+            app:layout_constraintTop_toTopOf="@id/key_pair_password"
             app:layout_constraintVertical_bias="0.48000002"
             app:srcCompat="@drawable/selector_show_password" />
 
@@ -273,7 +356,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/keypair_password" />
+            app:layout_constraintTop_toBottomOf="@id/key_pair_password" />
 
         <ProgressBar
             android:id="@+id/progress_bar_plot_creation"
@@ -289,7 +372,7 @@
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/keypair_password"
+            app:layout_constraintTop_toBottomOf="@id/key_pair_password"
             app:layout_constraintStart_toStartOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>

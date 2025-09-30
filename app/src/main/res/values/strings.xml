@@ -24,10 +24,10 @@
     <string name="action_add_miner">Add miner</string>
     <string name="action_add_miner_tooltip">Add a new miner for a mining endpoint</string>
     <string name="added_miner_uri_default">ws://panarea.hotmoka.io:8025</string>
-    <string name="add_miner_heading">"Add a new miner for the given mining endpoint URI and plot size. A key pair and its password must be provided as well, to identify the miner in blockchain."</string>
-    <string name="create_new_key">Create new key</string>
-    <string name="import_existing_key">Import existing key</string>
-    <string name="words_warning">The mnemonic phrase and password below are the keypair from which your new key is derived. Please save them on paper: they are needed to import the keypair in another app and to control the coins that will be earned by your new miner. Lost mnemonic or password cannot be recovered.</string>
+    <string name="add_miner_heading">"Specify the mining endpoint URI, the plot size and the public key that will identify the new miner in blockchain."</string>
+    <string name="create_key">Create key</string>
+    <string name="use_existing_key">Use existing key</string>
+    <string name="words_warning">The mnemonic phrase and password below are the key pair from which the new public key is derived. Please save them on paper: they are needed to import the key pair in another app and to control the coins that will be earned by the new miner. Lost mnemonic or password cannot be recovered.</string>
     <string name="word1">word 1</string>
     <string name="word2">word 2</string>
     <string name="word3">word 3</string>
@@ -42,7 +42,7 @@
     <string name="word12">word 12</string>
     <string name="add_miner_size_hint">plot size (number of nonces)</string>
     <string name="add_miner_uri_hint">URI of the mining endpoint</string>
-    <string name="add_miner_password_hint">Keypair\'s password</string>
+    <string name="add_miner_password_hint">Key pair\'s password</string>
     <string name="miner_card_name">%1$s (%2$s)</string>
     <string name="miner_card_public_key">public key: %1$s (%2$s)</string>
     <string name="miner_card_plot_size">plot size: %1$s</string>
@@ -67,4 +67,7 @@
     <string name="license">License: https://www.apache.org/licenses/LICENSE-2.0.txt (Apache 2.0)</string>
     <string name="miners_fragment_menu_pause_mining">Pause mining</string>
     <string name="miners_fragment_menu_unpause_mining">Unpause mining</string>
+    <string name="use_existing_key_pair">Use existing key pair</string>
+    <string name="insert_words_info">Insert the key pair below, as a mnemonic phrase and password.</string>
+    <string name="wrong_bip39_phrase">Wrong BIP39: %1$s</string>
 </resources>

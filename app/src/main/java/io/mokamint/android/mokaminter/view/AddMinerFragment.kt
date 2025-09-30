@@ -4,10 +4,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.TextView
 import androidx.annotation.UiThread
+import io.hotmoka.crypto.BIP39Dictionaries
 import io.hotmoka.crypto.BIP39Mnemonics
 import io.hotmoka.crypto.Entropies
+import io.hotmoka.crypto.api.Entropy
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.FragmentAddMinerBinding
 import io.mokamint.android.mokaminter.model.Miner
@@ -23,6 +27,8 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
     private val entropy = Entropies.random()
 
     private lateinit var wordsViews: Array<TextView>
+
+    private lateinit var insertWordsViews: Array<AutoCompleteTextView>
 
     /**
      * The identifier of the miner whose creation has been already scheduled by this fragment, if any.
@@ -42,44 +48,87 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             binding.word9, binding.word10, binding.word11, binding.word12
         )
 
+        insertWordsViews = arrayOf(
+            binding.insertWord1, binding.insertWord2, binding.insertWord3, binding.insertWord4,
+            binding.insertWord5, binding.insertWord6, binding.insertWord7, binding.insertWord8,
+            binding.insertWord9, binding.insertWord10, binding.insertWord11, binding.insertWord12
+        )
+
+        val allWords: Array<String> = BIP39Dictionaries.ENGLISH_DICTIONARY.allWords.toArray { i -> arrayOfNulls(i) }
+        val adapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, allWords)
+        insertWordsViews.forEach { view ->  view.setAdapter(adapter) }
+
         binding.addMinerButton.setOnClickListener {
             closeKeyboard()
             addMiner()
         }
 
-        binding.createNewKey.setOnCheckedChangeListener { button, isChecked ->
-            if (isChecked) configureForInsertionOfNewKeyPair() else configureForInsertionOfExistingPublicKey() }
+        binding.createKey.setOnCheckedChangeListener { button, isChecked ->
+            if (isChecked) configureForCreateKey() }
 
-        if (binding.createNewKey.isChecked)
-            configureForInsertionOfNewKeyPair()
+        binding.useExistingKey.setOnCheckedChangeListener { button, isChecked ->
+            if (isChecked) configureForUseExistingKey() }
+
+        binding.useExistingKeyPair.setOnCheckedChangeListener { button, isChecked ->
+            if (isChecked) configureForUseExistingKeyPair() }
+
+        if (binding.createKey.isChecked)
+            configureForCreateKey()
+        else if (binding.useExistingKey.isChecked)
+            configureForUseExistingKey()
+        else
+            configureForUseExistingKeyPair()
 
         return binding.root
     }
 
-    private fun configureForInsertionOfNewKeyPair() {
+    private fun configureForCreateKey() {
         var pos = 0
         BIP39Mnemonics.of(entropy.entropyAsBytes)
             .stream()
             .forEachOrdered { word ->
                 wordsViews[pos].text = getString(R.string.add_miner_bip39_word, pos + 1, word)
-                wordsViews[pos++].visibility = View.VISIBLE
+                pos++
             }
 
-        binding.keypairPassword.visibility = View.VISIBLE
+        binding.rowWords1.visibility = View.VISIBLE
+        binding.rowWords2.visibility = View.VISIBLE
+        binding.rowWords3.visibility = View.VISIBLE
+        binding.rowInsertWords1.visibility = View.GONE
+        binding.rowInsertWords2.visibility = View.GONE
+        binding.rowInsertWords3.visibility = View.GONE
+        binding.keyPairPassword.visibility = View.VISIBLE
         binding.hideShowKeyPairPassword.visibility = View.VISIBLE
-        binding.wordsWarning.visibility = View.VISIBLE
+        binding.mnemonicsInfo.visibility = View.VISIBLE
+        binding.mnemonicsInfo.text = getString(R.string.words_warning)
         binding.publicKeyBase58.visibility = View.GONE
     }
 
-    private fun configureForInsertionOfExistingPublicKey() {
-        wordsViews.forEach { view ->
-            view.visibility = View.GONE
-        }
-
-        binding.keypairPassword.visibility = View.GONE
+    private fun configureForUseExistingKey() {
+        binding.rowWords1.visibility = View.GONE
+        binding.rowWords2.visibility = View.GONE
+        binding.rowWords3.visibility = View.GONE
+        binding.rowInsertWords1.visibility = View.GONE
+        binding.rowInsertWords2.visibility = View.GONE
+        binding.rowInsertWords3.visibility = View.GONE
+        binding.keyPairPassword.visibility = View.GONE
         binding.hideShowKeyPairPassword.visibility = View.GONE
-        binding.wordsWarning.visibility = View.GONE
+        binding.mnemonicsInfo.visibility = View.GONE
         binding.publicKeyBase58.visibility = View.VISIBLE
+    }
+
+    private fun configureForUseExistingKeyPair() {
+        binding.rowWords1.visibility = View.GONE
+        binding.rowWords2.visibility = View.GONE
+        binding.rowWords3.visibility = View.GONE
+        binding.rowInsertWords1.visibility = View.VISIBLE
+        binding.rowInsertWords2.visibility = View.VISIBLE
+        binding.rowInsertWords3.visibility = View.VISIBLE
+        binding.keyPairPassword.visibility = View.VISIBLE
+        binding.hideShowKeyPairPassword.visibility = View.VISIBLE
+        binding.mnemonicsInfo.visibility = View.VISIBLE
+        binding.mnemonicsInfo.text = getString(R.string.insert_words_info)
+        binding.publicKeyBase58.visibility = View.GONE
     }
 
     private fun addMiner() {
@@ -107,13 +156,25 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             return
         }
 
-        if (binding.createNewKey.isChecked) {
-            val password = binding.keypairPassword.text.toString()
+        if (binding.createKey.isChecked) {
+            val password = binding.keyPairPassword.text.toString()
             uuid = getController().requestCreationOfMiner(uri, size, entropy, password, null)
         }
-        else {
+        else if (binding.useExistingKey.isChecked) {
             val publicKeyBase58 = binding.publicKeyBase58.text.toString()
             uuid = getController().requestCreationOfMiner(uri, size, null, null, publicKeyBase58)
+        }
+        else if (binding.useExistingKeyPair.isChecked) {
+            val words = insertWordsViews.map { view -> view.text.toString() }.toTypedArray()
+
+            try {
+                val entropy = Entropies.of(BIP39Mnemonics.of(words).bytes)
+                val password = binding.keyPairPassword.text.toString()
+                uuid = getController().requestCreationOfMiner(uri, size, entropy, password, null)
+            }
+            catch (e: IllegalArgumentException) {
+                notifyUser(getString(R.string.wrong_bip39_phrase, e.message))
+            }
         }
     }
 

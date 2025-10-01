@@ -73,8 +73,9 @@ dependencies {
     implementation(libs.io.mokamint.miner.local)
     implementation(libs.io.mokamint.plotter)
     implementation(libs.io.hotmoka.crypto)
+    // forces newer version: remove when imported in mokamint
     implementation(libs.io.hotmoka.marshalling)
-    implementation(libs.androidx.preference.ktx) // forces newer version: remove when imported in mokamint
+    implementation(libs.androidx.preference.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

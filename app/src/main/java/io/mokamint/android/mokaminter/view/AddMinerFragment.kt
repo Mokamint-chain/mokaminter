@@ -12,7 +12,6 @@ import androidx.preference.PreferenceManager
 import io.hotmoka.crypto.BIP39Dictionaries
 import io.hotmoka.crypto.BIP39Mnemonics
 import io.hotmoka.crypto.Entropies
-import io.hotmoka.crypto.api.Entropy
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.FragmentAddMinerBinding
 import io.mokamint.android.mokaminter.model.Miner

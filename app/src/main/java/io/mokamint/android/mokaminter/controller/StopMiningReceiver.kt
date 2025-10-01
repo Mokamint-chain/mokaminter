@@ -5,9 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import io.mokamint.android.mokaminter.MVC
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class StopMiningReceiver: BroadcastReceiver() {
 
@@ -21,12 +18,5 @@ class StopMiningReceiver: BroadcastReceiver() {
         val mvc = context.applicationContext as MVC
         // we stop the service
         MiningServices.stop(mvc)
-        // we also stop the view, if any
-        //mvc.view?.let {
-          //  CoroutineScope(Dispatchers.Main).launch { it.stop() }
-        //}
-
-        //This is used to close the notification tray
-        //context.sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
     }
 }

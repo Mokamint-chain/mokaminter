@@ -12,7 +12,6 @@ import io.mokamint.miner.service.MinerServices
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.net.URI
 import java.security.spec.InvalidKeySpecException

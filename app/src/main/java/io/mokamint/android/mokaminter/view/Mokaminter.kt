@@ -13,7 +13,6 @@ import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.MokaminterBinding
 
-
 class Mokaminter : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
 

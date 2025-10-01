@@ -157,7 +157,7 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             return
         }
 
-        val maxSize = PreferenceManager.getDefaultSharedPreferences(context).getString("max_plot_size", "1000")!!.toInt()
+        val maxSize = PreferenceManager.getDefaultSharedPreferences(context).getString("max_plot_size", "1000")!!.toLong()
         if (size > maxSize) {
             notifyUser(getString(R.string.add_miner_message_plot_size_limited, maxSize))
             return

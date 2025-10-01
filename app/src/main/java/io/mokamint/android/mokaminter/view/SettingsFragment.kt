@@ -1,13 +1,11 @@
 package io.mokamint.android.mokaminter.view
 
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.annotation.UiThread
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import io.mokamint.android.mokaminter.R
-import java.lang.NumberFormatException
 
 class SettingsFragment: PreferenceFragmentCompat(), Preference.OnPreferenceChangeListener, View {
 
@@ -37,25 +35,16 @@ class SettingsFragment: PreferenceFragmentCompat(), Preference.OnPreferenceChang
 
     @UiThread override fun onPreferenceChange(preference: Preference, newValue: Any): Boolean {
         if (preference.key == "max_plot_size") {
-            Log.d(SettingsFragment::class.simpleName, "${newValue::class.simpleName}")
             if (newValue is String) {
-                Log.d(SettingsFragment::class.simpleName, "String $newValue")
                 try {
-                    if (newValue.toInt() < 1) {
-                        Log.d(SettingsFragment::class.simpleName, "String < 1 $newValue")
-                        notifyUser(getString(R.string.settings_plot_size_must_be_a_positive_integer))
-                        return false
-                    }
+                    if (newValue.toLong() >= 1)
+                        return true
                 }
                 catch (_: NumberFormatException) {
-                    notifyUser(getString(R.string.settings_plot_size_must_be_a_positive_integer))
-                    return false
                 }
 
-                return true
+                notifyUser(getString(R.string.settings_plot_size_must_be_a_positive_integer))
             }
-
-            return false
         }
 
         return false

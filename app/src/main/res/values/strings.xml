@@ -10,13 +10,11 @@
     <string name="add_miner">Add miner</string>
     <string name="deleted_miner">Deleted miner %1$s</string>
     <string name="added_miner">Added miner %1$s</string>
-    <string name="operation_timeout">The operation timed-out!</string>
-    <string name="action_show_or_edit_miner">Show or edit</string>
-    <string name="action_show_or_edit_miner_tooltip">Shows and allows one to edit to details of this miner</string>
+    <string name="operation_timeout">The operation timed out!</string>
     <string name="action_delete_miner">Delete</string>
     <string name="action_delete_miner_tooltip">Allows one to delete this miner from the list of miners</string>
     <string name="delete_miner_question">Delete miner?</string>
-    <string name="delete_miner_confirmation_message">Do you really want to delete miner %1$s? Be sure to have already saved its key pair or otherwise you won\'t be able to access the coins earned so far.</string>
+    <string name="delete_miner_confirmation_message">Do you really want to delete miner %1$s?</string>
     <string name="dismiss">Dismiss</string>
     <string name="delete">Delete</string>
     <string name="create">Create</string>
@@ -28,7 +26,7 @@
     <string name="add_miner_heading">"Specify the mining endpoint URI, the plot size and the public key that will identify the new miner in blockchain."</string>
     <string name="create_key">Create key</string>
     <string name="use_existing_key">Use existing key</string>
-    <string name="words_warning">The mnemonic phrase and password below are the key pair from which the new public key is derived. Please save them on paper: they are needed to import the key pair in another app and to control the coins that will be earned by the new miner. Lost mnemonic or password cannot be recovered.</string>
+    <string name="words_warning">The mnemonic phrase and password below are the key pair from which the new public key is derived. Save them on paper now: they are needed to import the key pair in another app and to control the coins that will be earned by the new miner. Lost mnemonic or password cannot be recovered.</string>
     <string name="word1">word 1</string>
     <string name="word2">word 2</string>
     <string name="word3">word 3</string>
@@ -69,7 +67,7 @@
     <string name="miners_fragment_menu_pause_mining">Pause mining</string>
     <string name="miners_fragment_menu_unpause_mining">Unpause mining</string>
     <string name="use_existing_key_pair">Use existing key pair</string>
-    <string name="insert_words_info">Insert the key pair below, as a mnemonic phrase and password.</string>
+    <string name="insert_words_info">Insert the key pair below, as a mnemonic phrase and password</string>
     <string name="wrong_bip39_phrase">Wrong BIP39: %1$s</string>
     <string name="default_max_plot_size">1000</string>
     <string name="max_plot_size">Max plot size</string>

@@ -210,6 +210,13 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             progress.remove(miner)
         }
 
+        private fun totalNonces(miner: Miner): String {
+            return resources.getQuantityString(R.plurals.nonces,
+                // the quantity selector must be an Int but we have a Long here...
+                if (miner.size > 1000L) 1000 else miner.size.toInt(),
+                miner.size)
+        }
+
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
 
             fun bindTo(miner: Miner) {
@@ -217,28 +224,23 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
                         ContextCompat.getColor(context, R.color.mokamint_bright)
                     )
-                    binding.plotSize.text = getString(
-                        R.string.miner_card_plot_size,
-                        resources.getQuantityString(R.plurals.nonces,
-                            // the quantity selector must be an Int but we have a Long here...
-                            if (miner.size > 1000L) 1000 else miner.size.toInt(),
-                            miner.size)
-                    )
+                    binding.plotSize.text = getString(R.string.miner_card_plot_size, totalNonces(miner))
                 }
                 else {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
                         ContextCompat.getColor(context, R.color.mokamint_medium)
                     )
-                    val percent = progress.get(miner)
-                    val done = if (percent == null || percent == 0) 0 else miner.size * percent / 100
-                    binding.plotSize.text = getString(
-                        R.string.miner_card_plot_size_in_progress,
-                        done,
-                        resources.getQuantityString(R.plurals.nonces,
-                            // the quantity selector must be an Int but we have a Long here...
-                            if (miner.size > 1000L) 1000 else miner.size.toInt(),
-                            miner.size)
-                    )
+
+                    if (miner.hasPlotReady)
+                        binding.plotSize.text = getString(R.string.miner_card_plot_size, totalNonces(miner))
+                    else {
+                        val percent = progress[miner] ?: 0
+                        val noncesProcessed = miner.size * percent / 100
+                        binding.plotSize.text = getString(
+                            R.string.miner_card_plot_size_in_progress,
+                            noncesProcessed,
+                            totalNonces(miner))
+                    }
                 }
                 binding.name.text = getString(
                     R.string.miner_card_name,

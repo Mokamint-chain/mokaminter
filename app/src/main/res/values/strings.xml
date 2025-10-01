@@ -12,16 +12,16 @@
     <string name="added_miner">Added miner %1$s</string>
     <string name="operation_timeout">The operation timed out!</string>
     <string name="action_delete_miner">Delete</string>
-    <string name="action_delete_miner_tooltip">Allows one to delete this miner from the list of miners</string>
+    <string name="action_delete_miner_tooltip">Deletes this miner from the list of miners.</string>
     <string name="delete_miner_question">Delete miner?</string>
     <string name="delete_miner_confirmation_message">Do you really want to delete miner %1$s?</string>
     <string name="dismiss">Dismiss</string>
     <string name="delete">Delete</string>
     <string name="create">Create</string>
     <string name="action_reload_miners">Reload</string>
-    <string name="action_reload_miners_tooltip">Reload the miners\' information</string>
+    <string name="action_reload_miners_tooltip">Reloads the miners\' information.</string>
     <string name="action_add_miner">Add miner</string>
-    <string name="action_add_miner_tooltip">Add a new miner for a mining endpoint</string>
+    <string name="action_add_miner_tooltip">Adds a new miner for a mining endpoint.</string>
     <string name="added_miner_uri_default">ws://panarea.hotmoka.io:8025</string>
     <string name="add_miner_heading">"Specify the mining endpoint URI, the plot size and the public key that will identify the new miner in blockchain."</string>
     <string name="create_key">Create key</string>
@@ -53,7 +53,7 @@
     <string name="create_plot_question">Create plot file?</string>
     <string name="create_plot_confirmation_message">Do you really want to create a plot file on this device, for a miner called %1$s, containing %2$d nonces, with a total size of %3$.2f gigabytes?</string>
     <string name="plot_creation_completed">Completed creation of plot for miner %1$s</string>
-    <string name="add_miner_public_key_base58_hint">base58-encoded public key</string>
+    <string name="add_miner_public_key_base58_hint">Base58-encoded public key</string>
     <string name="add_miner_message_invalid_public_key">The inserted public key is invalid</string>
     <string name="add_miner_message_public_key_not_base58">The inserted public key is not in Base58 format</string>
     <string name="add_miner_bip39_word">%1$d: %2$s</string>
@@ -67,7 +67,7 @@
     <string name="miners_fragment_menu_pause_mining">Pause mining</string>
     <string name="miners_fragment_menu_unpause_mining">Unpause mining</string>
     <string name="use_existing_key_pair">Use existing key pair</string>
-    <string name="insert_words_info">Insert the key pair below, as a mnemonic phrase and password</string>
+    <string name="insert_words_info">Insert the key pair below, as a mnemonic phrase and password.</string>
     <string name="wrong_bip39_phrase">Wrong BIP39: %1$s</string>
     <string name="default_max_plot_size">1000</string>
     <string name="max_plot_size">Max plot size</string>

@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.io.hotmoka.crypto)
     // forces newer version: remove when imported in mokamint
     implementation(libs.io.hotmoka.marshalling)
+    implementation(libs.io.hotmoka.websockets.client)
     implementation(libs.androidx.preference.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

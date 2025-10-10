@@ -13,6 +13,7 @@ import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
 import java.util.UUID
@@ -29,6 +30,7 @@ class Controller {
     private val mvc: MVC
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
+    private val defaultScope = CoroutineScope(Dispatchers.Default)
     private val working = AtomicInteger(0)
 
     @Volatile
@@ -48,17 +50,17 @@ class Controller {
 
     constructor(mvc: MVC) {
         this.mvc = mvc
-        ioScope.launch { sanityCheck() }
+        defaultScope.launch { sanityCheck() }
     }
 
     /**
      * Recreates services that have been closed and fetches the balances
      * of the miners, if currently needed by the controller.
      */
-    private fun sanityCheck() {
+    private suspend fun sanityCheck() {
         while (true) {
             Log.d(TAG, "sanityCheck")
-            Thread.sleep(SANITY_CHECK_INTERVAL)
+            delay(SANITY_CHECK_INTERVAL)
 
             if (!isMiningPaused)
                 MiningServices.update(mvc)

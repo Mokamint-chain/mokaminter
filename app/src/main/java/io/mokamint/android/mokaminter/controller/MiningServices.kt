@@ -4,8 +4,11 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.ServiceCompat
 import io.hotmoka.websockets.api.FailedDeploymentException
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
@@ -74,7 +77,13 @@ class MiningServices: Service() {
             .addAction(action)
             .build()
 
-        startForeground(101, notification)
+        ServiceCompat.startForeground(this, 101, notification,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            } else {
+                0
+            }
+        )
     }
 
     override fun getApplicationContext(): MVC {

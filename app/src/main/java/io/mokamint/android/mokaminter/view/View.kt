@@ -51,9 +51,8 @@ interface View {
      * Called when the balance of a miner has changed.
      *
      * @param miner the miner whose balance has changed
-     * @param newBalance the new balance of the miner
      */
-    @UiThread fun onBalanceChanged(miner: Miner, newBalance: BigInteger) {}
+    @UiThread fun onBalanceChanged(miner: Miner) {}
 
     /**
      * Called when mining with the given miner starts.
@@ -110,4 +109,18 @@ interface View {
      * @param miner the miner for which the plot is being created
      */
     @UiThread fun onPlotCreationCompleted(miner: Miner) {}
+
+    /**
+     * Called when the given miner has been turned on.
+     *
+     * @param miner the miner that has been turned on
+     */
+    @UiThread fun onTurnedOn(miner: Miner) {}
+
+    /**
+     * Called when the given miner has been turned off.
+     *
+     * @param miner the miner that has been turned off
+     */
+    @UiThread fun onTurnedOff(miner: Miner) {}
 }

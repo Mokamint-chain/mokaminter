@@ -64,6 +64,164 @@ class Miners(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Adds the given miner to this container. If it is already in this container,
+     * this method does nothing.
+     *
+     * @param miner the miner to add
+     */
+    fun add(miner: Miner) {
+        synchronized (miners) {
+            if (miners.add(miner)) {
+                writeIntoInternalStorage()
+                mainScope.launch { mvc.view?.onMinerAdded(miner) }
+                Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
+            }
+        }
+    }
+
+    /**
+     * Removes the given miner from this container.
+     * If it is not contained in this container, this method does nothing.
+     *
+     * @param miner the miner to remove
+     */
+    fun remove(miner: Miner) {
+        synchronized (miners) {
+            if (miners.remove(miner)) {
+                writeIntoInternalStorage()
+                mainScope.launch { mvc.view?.onMinerDeleted(miner) }
+                Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
+            }
+        }
+    }
+
+    /**
+     * Takes note that the given miner has a plot now.
+     *
+     * @param miner the miner; if it does not belong to this set of miners,
+     *              this method does nothing
+     * @return the miner information derived from {@code miner}, but where
+     *         it has been taken note that the miner has a plot now
+     */
+    fun markHasPlot(miner: Miner): Miner {
+        synchronized (miners) {
+            if (!miner.hasPlotReady && miners.remove(miner)) {
+                val result = miner.withPlotReady()
+                miners.add(result)
+                writeIntoInternalStorage()
+                return result
+            }
+            else
+                return miner
+        }
+    }
+
+    /**
+     * Takes note that the given miner is on now.
+     *
+     * @param miner the miner; if it does not belong to this set of miners,
+     *              this method does nothing
+     * @return the miner information derived from {@code miner}, but where
+     *         it has been taken note that the miner is on now
+     */
+    fun markAsOn(miner: Miner): Miner {
+        synchronized (miners) {
+            if (!miner.isOn && miners.remove(miner)) {
+                val result = miner.turnedOn()
+                miners.add(result)
+                writeIntoInternalStorage()
+                mainScope.launch { mvc.view?.onTurnedOn(result) }
+                Log.i(TAG, "Turned on miner ${miner.miningSpecification.name}")
+                return result
+            }
+            else
+                return miner
+        }
+    }
+
+    /**
+     * Takes note that the given miner is off now.
+     *
+     * @param miner the miner; if it does not belong to this set of miners,
+     *              this method does nothing
+     * @return the miner information derived from {@code miner}, but where
+     *         it has been taken note that the miner is off now
+     */
+    fun markAsOff(miner: Miner): Miner {
+        synchronized (miners) {
+            if (miner.isOn && miners.remove(miner)) {
+                val result = miner.turnedOff()
+                miners.add(result)
+                writeIntoInternalStorage()
+                mainScope.launch { mvc.view?.onTurnedOff(result) }
+                Log.i(TAG, "Turned off miner ${miner.miningSpecification.name}")
+                return result
+            }
+            else
+                return miner
+        }
+    }
+
+    /**
+     * Takes note that the given miner has the given balance now.
+     *
+     * @param miner the miner; if it does not belong to this set of miners,
+     *              this method does nothing
+     * @return the miner information derived from {@code miner}, but where
+     *         the new balance of the miner has been taken note of
+     */
+    fun markHasBalance(miner: Miner, balance: BigInteger): Miner {
+        synchronized (miners) {
+            if (miner.balance != balance && miners.remove(miner)) {
+                val result = miner.withBalance(balance)
+                miners.add(result)
+                writeIntoInternalStorage()
+
+                mainScope.launch {
+                    mvc.view?.onBalanceChanged(result)
+                }
+
+                return result
+            }
+            else
+                return miner
+        }
+    }
+
+    fun startedMiningWith(miner: Miner) {
+        synchronized (currentlyUsedForMining) {
+            currentlyUsedForMining.add(miner)
+        }
+
+        mainScope.launch { mvc.view?.onStartedMiningWith(miner) }
+    }
+
+    fun stoppedMiningWith(miner: Miner) {
+        synchronized (currentlyUsedForMining) {
+            currentlyUsedForMining.remove(miner)
+        }
+
+        mainScope.launch { mvc.view?.onStoppedMiningWith(miner) }
+    }
+
+    fun isCurrentlyUsedForMining(miner: Miner): Boolean {
+        synchronized (currentlyUsedForMining) {
+            return currentlyUsedForMining.contains(miner)
+        }
+    }
+
+    /**
+     * Yields a snapshot of the miners in this container, in increasing order.
+     *
+     * @return the snapshot of the miners, in increasing order
+     */
+    fun snapshot(): Array<Miner> {
+        synchronized (miners) {
+            return miners.stream().toArray { i -> arrayOfNulls(i) }
+        }
+    }
+
     @GuardedBy("this.miners")
     private fun readMiners(parser: XmlPullParser) {
         parser.require(XmlPullParser.START_TAG, null, MINERS_TAG)
@@ -106,118 +264,6 @@ class Miners(private val mvc: MVC) {
 
             serializer.endDocument()
             serializer.flush()
-        }
-    }
-
-    /**
-     * Adds the given miner to this container. If it is already in this container,
-     * this method does nothing.
-     *
-     * @param miner the miner to add
-     */
-    fun add(miner: Miner) {
-        synchronized (miners) {
-            if (miners.add(miner)) {
-                writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onMinerAdded(miner) }
-                Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
-            }
-        }
-    }
-
-    /**
-     * Takes note that the given miner has a plot now.
-     *
-     * @param miner the miner; if it does not belong to this set of miners,
-     *              this method does nothing
-     * @return the miner information derived from {@code miner}, but where
-     *         it has been taken note that the miner has a plot now
-     */
-    fun markHasPlot(miner: Miner): Miner {
-        synchronized (miners) {
-            if (!miner.hasPlotReady && miners.remove(miner)) {
-                val result = miner.withPlotReady()
-                miners.add(result)
-                writeIntoInternalStorage()
-                return result
-            }
-            else
-                return miner
-        }
-    }
-
-    /**
-     * Takes note that the given miner has the given balance now.
-     *
-     * @param miner the miner; if it does not belong to this set of miners,
-     *              this method does nothing
-     * @return the miner information derived from {@code miner}, but where
-     *         the new balance of the miner has been taken note of
-     */
-    fun markHasBalance(miner: Miner, balance: BigInteger): Miner {
-        synchronized (miners) {
-            if (miner.balance != balance && miners.remove(miner)) {
-                val result = miner.withBalance(balance)
-                miners.add(result)
-                writeIntoInternalStorage()
-
-                mainScope.launch {
-                    mvc.view?.onBalanceChanged(miner, balance)
-                }
-
-                return result
-            }
-            else
-                return miner
-        }
-    }
-
-    /**
-     * Removes the given miner from this container.
-     * If it is not contained in this container, this method does nothing.
-     *
-     * @param miner the miner to remove
-     */
-    fun remove(miner: Miner) {
-        synchronized (miners) {
-            if (miners.remove(miner)) {
-                writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onMinerDeleted(miner) }
-                Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
-            }
-        }
-    }
-
-    fun startedMiningWith(miner: Miner) {
-        synchronized (currentlyUsedForMining) {
-            currentlyUsedForMining.add(miner)
-        }
-
-        mainScope.launch { mvc.view?.onStartedMiningWith(miner) }
-    }
-
-    fun stoppedMiningWith(miner: Miner) {
-        synchronized (currentlyUsedForMining) {
-            currentlyUsedForMining.remove(miner)
-        }
-
-        mainScope.launch { mvc.view?.onStoppedMiningWith(miner) }
-    }
-
-    fun isCurrentlyUsedForMining(miner: Miner): Boolean {
-        synchronized (currentlyUsedForMining) {
-            return currentlyUsedForMining.contains(miner)
-        }
-    }
-
-    /**
-     * Yields a snapshot of the miners in this container, in increasing order.
-     *
-     * @return the snapshot of the miners, in increasing order
-     */
-    fun snapshot(): Array<Miner> {
-        synchronized (miners) {
-            return miners.stream().toArray { i -> arrayOfNulls(i) }
         }
     }
 }

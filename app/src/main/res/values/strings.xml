@@ -76,4 +76,6 @@
     <string name="settings_plot_size_must_be_a_positive_integer">The plot size must be a positive integer value</string>
     <string name="add_miner_message_plot_size_limited">The max plot size is %1$d; you can change it from the settings page</string>
     <string name="menu_miners">Miners</string>
+    <string name="action_turn_on_miner">Turn on</string>
+    <string name="action_turn_off_miner">Turn off</string>
 </resources>

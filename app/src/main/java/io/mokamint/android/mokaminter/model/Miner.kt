@@ -68,6 +68,11 @@ class Miner: Comparable<Miner>, Parcelable {
      */
     val hasPlotReady: Boolean
 
+    /**
+     * True if and only if mining with this miner is turned on.
+     */
+    val isOn: Boolean
+
     companion object {
         private const val UUID_TAG = "uuid"
         private const val MINING_SPECIFICATION_TAG = "miningSpecification"
@@ -83,6 +88,7 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG = "publicKeyForSigningDeadlinesBase58"
         private const val BALANCE_TAG = "balance"
         private const val HAS_PLOT_READY_TAG = "hasPlotReady"
+        private const val IS_ON_TAG = "isOn"
 
         @Suppress("unused") @JvmField
         val CREATOR = object : Parcelable.Creator<Miner?> {
@@ -116,6 +122,7 @@ class Miner: Comparable<Miner>, Parcelable {
         this.publicKeyBase58 = publicKeyBase58
         this.hasPlotReady = false
         this.balance = BigInteger.ZERO
+        this.isOn = true
 
         if (size < 1)
             throw IllegalArgumentException("The plot size must be a strictly positive number")
@@ -153,6 +160,8 @@ class Miner: Comparable<Miner>, Parcelable {
         this.balance = parcel.readSerializable() as BigInteger
 
         this.hasPlotReady = parcel.readByte() != 0.toByte()
+
+        this.isOn = parcel.readByte() != 0.toByte()
     }
 
     constructor(parser: XmlPullParser) {
@@ -164,6 +173,7 @@ class Miner: Comparable<Miner>, Parcelable {
         var publicKeyBase58: String? = null
         var balance: BigInteger?= null
         var hasPlotReady: Boolean? = null
+        var isOn: Boolean? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG)
@@ -176,6 +186,7 @@ class Miner: Comparable<Miner>, Parcelable {
                 SIZE_TAG -> size = readSize(parser)
                 PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG -> publicKeyBase58 = readText(parser)
                 HAS_PLOT_READY_TAG -> hasPlotReady = readBoolean(parser)
+                IS_ON_TAG -> isOn = readBoolean(parser)
                 BALANCE_TAG -> balance = readBigInteger(parser)
                 else -> skip(parser)
             }
@@ -201,9 +212,11 @@ class Miner: Comparable<Miner>, Parcelable {
         this.balance = balance ?: throw XmlPullParserException("Missing balance in miner")
 
         this.hasPlotReady = hasPlotReady ?: throw XmlPullParserException("Missing hasPlotReady field in miner")
+
+        this.isOn = isOn ?: throw XmlPullParserException("Missing isOn field in miner")
     }
 
-    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKey: PublicKey, publicKeyBase58: String, balance: BigInteger, hasPlotReady: Boolean) {
+    private constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKey: PublicKey, publicKeyBase58: String, balance: BigInteger, hasPlotReady: Boolean, isOn: Boolean) {
         this.uuid = uuid
         this.miningSpecification = miningSpecification
         this.uri = uri
@@ -212,6 +225,7 @@ class Miner: Comparable<Miner>, Parcelable {
         this.publicKeyBase58 = publicKeyBase58
         this.balance = balance
         this.hasPlotReady = hasPlotReady
+        this.isOn = isOn
     }
 
     fun writeWith(serializer: XmlSerializer, tag: String) {
@@ -264,15 +278,27 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.text(hasPlotReady.toString())
         serializer.endTag(null, HAS_PLOT_READY_TAG)
 
+        serializer.startTag(null, IS_ON_TAG)
+        serializer.text(isOn.toString())
+        serializer.endTag(null, IS_ON_TAG)
+
         serializer.endTag(null, tag)
     }
 
     fun withPlotReady(): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, true)
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, true, isOn)
     }
 
     fun withBalance(balance: BigInteger): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady)
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, isOn)
+    }
+
+    fun turnedOn(): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, true)
+    }
+
+    fun turnedOff(): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, false)
     }
 
     /**
@@ -473,6 +499,7 @@ class Miner: Comparable<Miner>, Parcelable {
         out.writeByteArray(publicKeyBytes)
         out.writeSerializable(balance)
         out.writeByte(if (hasPlotReady) 1.toByte() else 0.toByte())
+        out.writeByte(if (isOn) 1.toByte() else 0.toByte())
     }
 
     override fun compareTo(other: Miner): Int {

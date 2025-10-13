@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.xmlpull.v1.XmlPullParser
 import java.io.FileNotFoundException
+import java.math.BigInteger
 import java.util.TreeSet
 
 /**
@@ -47,30 +48,30 @@ class Miners(private val mvc: MVC) {
     fun reload() {
         synchronized (miners) {
             miners.clear()
-        }
 
-        try {
-            mvc.openFileInput(FILENAME).use {
-                val parser = Xml.newPullParser()
-                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-                parser.setInput(it, null)
-                parser.nextTag()
-                readMiners(parser)
+            try {
+                mvc.openFileInput(FILENAME).use {
+                    val parser = Xml.newPullParser()
+                    parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+                    parser.setInput(it, null)
+                    parser.nextTag()
+                    readMiners(parser)
+                }
+            } catch (_: FileNotFoundException) {
+                // this is fine: initially the file of the miners is missing
+                Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
             }
-        }
-        catch (_: FileNotFoundException) {
-            // this is fine: initially the file of the miners is missing
-            Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
         }
     }
 
+    @GuardedBy("this.miners")
     private fun readMiners(parser: XmlPullParser) {
         parser.require(XmlPullParser.START_TAG, null, MINERS_TAG)
 
         while (parser.next() != XmlPullParser.END_TAG)
             if (parser.eventType == XmlPullParser.START_TAG)
                 if (parser.name == MINER_TAG)
-                    add(Miner(parser))
+                    miners.add(Miner(parser))
                 else
                     skip(parser)
 
@@ -91,7 +92,8 @@ class Miners(private val mvc: MVC) {
     /**
      * Writes this set of miners in the internal storage of the app, as an XML file.
      */
-    fun writeIntoInternalStorage() {
+    @GuardedBy("this.miners")
+    private fun writeIntoInternalStorage() {
         mvc.openFileOutput(FILENAME, Context.MODE_PRIVATE).use {
             val serializer = Xml.newSerializer()
             serializer.setOutput(it, "UTF-8")
@@ -99,9 +101,7 @@ class Miners(private val mvc: MVC) {
             serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true)
 
             serializer.startTag(null, MINERS_TAG)
-            synchronized (miners) {
-                miners.forEach { miner -> miner.writeWith(serializer, MINER_TAG) }
-            }
+            miners.forEach { miner -> miner.writeWith(serializer, MINER_TAG) }
             serializer.endTag(null, MINERS_TAG)
 
             serializer.endDocument()
@@ -110,24 +110,81 @@ class Miners(private val mvc: MVC) {
     }
 
     /**
-     * Adds the given miner to this container.
+     * Adds the given miner to this container. If it is already in this container,
+     * this method does nothing.
      *
      * @param miner the miner to add
      */
     fun add(miner: Miner) {
         synchronized (miners) {
-            miners.add(miner)
+            if (miners.add(miner)) {
+                writeIntoInternalStorage()
+                mainScope.launch { mvc.view?.onMinerAdded(miner) }
+                Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
+            }
+        }
+    }
+
+    /**
+     * Takes note that the given miner has a plot now.
+     *
+     * @param miner the miner; if it does not belong to this set of miners,
+     *              this method does nothing
+     * @return the miner information derived from {@code miner}, but where
+     *         it has been taken note that the miner has a plot now
+     */
+    fun markHasPlot(miner: Miner): Miner {
+        synchronized (miners) {
+            if (!miner.hasPlotReady && miners.remove(miner)) {
+                val result = miner.withPlotReady()
+                miners.add(result)
+                writeIntoInternalStorage()
+                return result
+            }
+            else
+                return miner
+        }
+    }
+
+    /**
+     * Takes note that the given miner has the given balance now.
+     *
+     * @param miner the miner; if it does not belong to this set of miners,
+     *              this method does nothing
+     * @return the miner information derived from {@code miner}, but where
+     *         the new balance of the miner has been taken note of
+     */
+    fun markHasBalance(miner: Miner, balance: BigInteger): Miner {
+        synchronized (miners) {
+            if (miner.balance != balance && miners.remove(miner)) {
+                val result = miner.withBalance(balance)
+                miners.add(result)
+                writeIntoInternalStorage()
+
+                mainScope.launch {
+                    mvc.view?.onBalanceChanged(miner, balance)
+                }
+
+                return result
+            }
+            else
+                return miner
         }
     }
 
     /**
      * Removes the given miner from this container.
+     * If it is not contained in this container, this method does nothing.
      *
      * @param miner the miner to remove
      */
     fun remove(miner: Miner) {
         synchronized (miners) {
-            miners.remove(miner)
+            if (miners.remove(miner)) {
+                writeIntoInternalStorage()
+                mainScope.launch { mvc.view?.onMinerDeleted(miner) }
+                Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
+            }
         }
     }
 
@@ -154,11 +211,11 @@ class Miners(private val mvc: MVC) {
     }
 
     /**
-     * Yields the miners in this container, in increasing order.
+     * Yields a snapshot of the miners in this container, in increasing order.
      *
-     * @return the miners, in increasing order
+     * @return the snapshot of the miners, in increasing order
      */
-    fun elements(): Array<Miner> {
+    fun snapshot(): Array<Miner> {
         synchronized (miners) {
             return miners.stream().toArray { i -> arrayOfNulls(i) }
         }

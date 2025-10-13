@@ -155,7 +155,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
         @SuppressLint("NotifyDataSetChanged")
         fun update() {
-            miners = getModel().miners.elements()
+            miners = getModel().miners.snapshot()
 
             if (miners.isEmpty()) {
                 // if there are no miners, we create a quick
@@ -171,7 +171,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
         fun progressPlotCreation(miner: Miner, percent: Int) {
             progress.put(miner, percent)
-            miners = getModel().miners.elements()
+            //miners = getModel().miners.elements()
 
             // if the miner whose plot is being created is among those in this adapter,
             // we require a redraw of its item only
@@ -184,7 +184,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
 
         fun updateBalance(miner: Miner, balance: BigInteger) {
-            miners = getModel().miners.elements()
+            //miners = getModel().miners.elements()
 
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
@@ -197,7 +197,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
 
         fun updateMiningStatus(miner: Miner) {
-            miners = getModel().miners.elements()
+            //miners = getModel().miners.elements()
 
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only

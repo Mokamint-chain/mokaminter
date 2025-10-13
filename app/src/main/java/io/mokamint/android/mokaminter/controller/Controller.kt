@@ -127,9 +127,6 @@ class Controller {
                 Log.w(TAG, "Failed deleting $filename")
 
             mvc.model.miners.remove(miner)
-            mvc.model.miners.writeIntoInternalStorage()
-            mainScope.launch { mvc.view?.onMinerDeleted(miner) }
-            Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
 
             MiningServices.update(mvc)
         }
@@ -189,9 +186,6 @@ class Controller {
             mainScope.launch { mvc.view?.onPlotCreationStarted(miner) }
 
             mvc.model.miners.add(miner)
-            mvc.model.miners.writeIntoInternalStorage()
-            mainScope.launch { mvc.view?.onMinerAdded(miner) }
-            Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
 
             Plots.create(path, miner.getProlog(), 0, miner.size, miner.miningSpecification.hashingForDeadlines) { percent ->
                 mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
@@ -199,10 +193,7 @@ class Controller {
             }
 
             // we replace the miner with an identical card, but whose "has plot" flag is true
-            mvc.model.miners.remove(miner)
-            mvc.model.miners.add(miner.withPlotReady())
-            mvc.model.miners.writeIntoInternalStorage()
-
+            mvc.model.miners.markHasPlot(miner)
             Log.i(TAG, "Completed creation of $path for miner ${miner.miningSpecification.name}")
             mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
 

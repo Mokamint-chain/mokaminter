@@ -2,7 +2,6 @@ package io.mokamint.android.mokaminter.view
 
 import androidx.annotation.UiThread
 import io.mokamint.android.mokaminter.model.Miner
-import java.math.BigInteger
 
 interface View {
 
@@ -38,14 +37,14 @@ interface View {
      *
      * @param deleted the deleted miner
      */
-    @UiThread fun onMinerDeleted(deleted: Miner) {}
+    @UiThread fun onDeleted(deleted: Miner) {}
 
     /**
      * Called when a miner has been added.
      *
      * @param added the added miner
      */
-    @UiThread fun onMinerAdded(added: Miner) {}
+    @UiThread fun onAdded(added: Miner) {}
 
     /**
      * Called when the balance of a miner has changed.
@@ -123,4 +122,18 @@ interface View {
      * @param miner the miner that has been turned off
      */
     @UiThread fun onTurnedOff(miner: Miner) {}
+
+    /**
+     * Called when the given miner has been connected.
+     *
+     * @param miner the miner that has been connected
+     */
+    @UiThread fun onConnected(miner: Miner) {}
+
+    /**
+     * Called when the given miner has been disconnected.
+     *
+     * @param miner the miner that has been disconnected
+     */
+    @UiThread fun onDisconnected(miner: Miner) {}
 }

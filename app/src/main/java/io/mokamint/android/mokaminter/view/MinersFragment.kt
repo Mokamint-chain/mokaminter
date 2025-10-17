@@ -3,7 +3,6 @@ package io.mokamint.android.mokaminter.view
 import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -21,7 +20,6 @@ import io.mokamint.android.mokaminter.databinding.FragmentMinersBinding
 import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
-import java.math.BigInteger
 import androidx.core.view.get
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
@@ -46,7 +44,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     override fun onResume() {
-        getController().requestReloadOfMiners()
+        getController().startServiceForAllMiners()
         // we request to fetch the balances only when the fragment is visible,
         // to reduce network congestion
         getController().startRequestingBalances()
@@ -81,7 +79,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_reload -> {
-                getController().requestReloadOfMiners()
+                //getController().startServiceForAllMiners()
                 true
             }
             R.id.action_add_miner -> {
@@ -104,12 +102,12 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         adapter.update()
     }
 
-    @UiThread override fun onMinerDeleted(deleted: Miner) {
+    @UiThread override fun onDeleted(deleted: Miner) {
         adapter.update()
         notifyUser(getString(R.string.deleted_miner, deleted.miningSpecification.name))
     }
 
-    @UiThread override fun onMinerAdded(added: Miner) {
+    @UiThread override fun onAdded(added: Miner) {
         adapter.update()
         notifyUser(getString(R.string.added_miner, added.miningSpecification.name))
     }
@@ -129,21 +127,29 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     @UiThread override fun onTurnedOn(miner: Miner) {
-        adapter.turnOn(miner)
+        adapter.update(miner)
     }
 
     @UiThread override fun onTurnedOff(miner: Miner) {
-        adapter.turnOff(miner)
+        adapter.update(miner)
+    }
+
+    @UiThread override fun onConnected(miner: Miner) {
+        adapter.update(miner)
+    }
+
+    @UiThread override fun onDisconnected(miner: Miner) {
+        adapter.update(miner)
     }
 
     @UiThread
     override fun onStartedMiningWith(miner: Miner) {
-        adapter.updateMiningStatus(miner)
+        adapter.update(miner)
     }
 
     @UiThread
     override fun onStoppedMiningWith(miner: Miner) {
-        adapter.updateMiningStatus(miner)
+        adapter.update(miner)
     }
 
     override fun onMiningPaused() {
@@ -232,7 +238,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             }
         }
 
-        fun updateMiningStatus(miner: Miner) {
+        fun update(miner: Miner) {
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
@@ -256,7 +262,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
 
             fun bindTo(miner: Miner) {
-                if (context.applicationContext.model.miners.isCurrentlyUsedForMining(miner)) {
+                if (getController().hasConnectedServiceFor(miner)) {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
                         ContextCompat.getColor(context, R.color.mokamint_bright)
                     )
@@ -311,11 +317,13 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                         true
                     }
                     R.id.action_turn_off_miner -> {
-                        getModel().miners.markAsOff(miner)
+                        val miner = getModel().miners.markAsOff(miner)
+                        getController().stopServiceFor(miner)
                         true
                     }
                     R.id.action_turn_on_miner -> {
-                        getModel().miners.markAsOn(miner)
+                        val miner = getModel().miners.markAsOn(miner)
+                        getController().startServiceFor(miner)
                         true
                     }
                     else -> false

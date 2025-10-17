@@ -8,7 +8,10 @@ import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.miner.api.MiningSpecification
+import io.mokamint.miner.local.LocalMiners
+import io.mokamint.miner.service.AbstractReconnectingMinerService
 import io.mokamint.miner.service.MinerServices
+import io.mokamint.miner.service.api.ReconnectingMinerService
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +19,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
+import java.util.Optional
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.Volatile
@@ -32,6 +37,11 @@ class Controller {
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val defaultScope = CoroutineScope(Dispatchers.Default)
     private val working = AtomicInteger(0)
+
+    /**
+     * A map from active miners to their servicing object.
+     */
+    private val services = ConcurrentHashMap<Miner, ReconnectingMinerService>()
 
     @Volatile
     private var isRequestingBalances = false
@@ -51,6 +61,46 @@ class Controller {
     constructor(mvc: MVC) {
         this.mvc = mvc
         defaultScope.launch { sanityCheck() }
+    }
+
+    fun startServiceFor(miner: Miner) {
+        services.computeIfAbsent(miner) { m -> createService(m) };
+    }
+
+    fun stopServiceFor(miner: Miner) {
+        // TODO: close it in a work manager because it might be slow
+        services.remove(miner)?.close()
+    }
+
+    fun hasConnectedServiceFor(miner: Miner): Boolean {
+        return services.get(miner)?.isConnected == true
+    }
+
+    private fun createService(miner: Miner): ReconnectingMinerService {
+        val filename = "${miner.uuid}.plot"
+        val path = mvc.filesDir.toPath().resolve(filename)
+        val plot = Plots.load(path)
+
+        val localMiner = LocalMiners.of(
+            "Local miner for ${miner.miningSpecification.name}",
+            "A miner working for ${miner.uri}",
+            { signature, publicKey -> Optional.empty() },
+            plot
+        )
+
+        return object :
+            AbstractReconnectingMinerService(Optional.of(localMiner), miner.uri, 30000, 30000) {
+
+            override fun onConnected() {
+                super.onConnected()
+                mainScope.launch { mvc.view?.onConnected(miner) }
+            }
+
+            override fun onDisconnected() {
+                super.onDisconnected()
+                mainScope.launch { mvc.view?.onDisconnected(miner) }
+            }
+        }
     }
 
     /**
@@ -107,14 +157,16 @@ class Controller {
         return isRequestingBalances
     }
 
-    fun requestReloadOfMiners() {
-        safeRunAsIO {
+    fun startServiceForAllMiners() {
+        //safeRunAsIO {
             mvc.model.miners.reload()
+                .filter { miner ->  miner.isOn }
+                .forEach { miner ->  startServiceFor(miner) }
             mainScope.launch { mvc.view?.onMinersReloaded() }
             Log.i(TAG, "Reloaded the list of miners")
-            MiningServices.update(mvc)
-            MiningServices.fetchBalances(mvc)
-        }
+            //MiningServices.update(mvc)
+            //MiningServices.fetchBalances(mvc)
+        //}
     }
 
     fun requestDelete(miner: Miner) {

@@ -45,7 +45,7 @@ class Miners(private val mvc: MVC) {
     /**
      * Loads the set of miners from the XML file on disk.
      */
-    fun reload() {
+    fun reload(): Array<Miner> {
         synchronized (miners) {
             miners.clear()
 
@@ -61,6 +61,8 @@ class Miners(private val mvc: MVC) {
                 // this is fine: initially the file of the miners is missing
                 Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
             }
+
+            return miners.toTypedArray()
         }
     }
 
@@ -74,7 +76,7 @@ class Miners(private val mvc: MVC) {
         synchronized (miners) {
             if (miners.add(miner)) {
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onMinerAdded(miner) }
+                mainScope.launch { mvc.view?.onAdded(miner) }
                 Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
             }
         }
@@ -90,7 +92,7 @@ class Miners(private val mvc: MVC) {
         synchronized (miners) {
             if (miners.remove(miner)) {
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onMinerDeleted(miner) }
+                mainScope.launch { mvc.view?.onDeleted(miner) }
                 Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
             }
         }

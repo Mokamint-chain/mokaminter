@@ -28,17 +28,6 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".controller.MiningServices"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" >
-        </service>
-
-        <receiver
-            android:name=".controller.StopMiningReceiver">
-        </receiver>
-
     </application>
 
 </manifest>

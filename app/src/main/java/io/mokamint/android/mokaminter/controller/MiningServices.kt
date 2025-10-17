@@ -100,9 +100,6 @@ class MiningServices: Service() {
     }
 
     private fun startMiningWith(miner: Miner) {
-        if (applicationContext.controller.isMiningPaused())
-            return
-
         activeServices.computeIfAbsent(miner) { x ->
             var service: MinerService?
             val filename = "${miner.uuid}.plot"

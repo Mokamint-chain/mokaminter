@@ -46,9 +46,6 @@ class Controller {
     @Volatile
     private var isRequestingBalances = false
 
-    @Volatile
-    private var isMiningPaused = false
-
     companion object {
         private val TAG = Controller::class.simpleName
 
@@ -112,9 +109,6 @@ class Controller {
             Log.d(TAG, "sanityCheck")
             delay(SANITY_CHECK_INTERVAL)
 
-            if (!isMiningPaused)
-                MiningServices.update(mvc)
-
             // we only request the balances if the controller asks so,
             // in order to reduce network congestion
             if (isRequestingBalances())
@@ -126,23 +120,8 @@ class Controller {
         return working.get() > 0
     }
 
-    fun isMiningPaused(): Boolean {
-        return isMiningPaused
-    }
-
-    fun pauseMining() {
-        isMiningPaused = true
-        mvc.view?.onMiningPaused()
-    }
-
     fun requestPauseMining() {
         MiningServices.stop(mvc)
-    }
-
-    fun requestUnpauseMining() {
-        isMiningPaused = false
-        MiningServices.update(mvc)
-        mvc.view?.onMiningUnpaused()
     }
 
     fun startRequestingBalances() {

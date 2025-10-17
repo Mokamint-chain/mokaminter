@@ -97,7 +97,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     @UiThread override fun onPlotCreationCompleted(miner: Miner) {
         adapter.progressStops(miner)
-        adapter.update()
+        adapter.update(miner)
         notifyUser(getString(R.string.plot_creation_completed, miner.miningSpecification.name))
     }
 
@@ -118,16 +118,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     @UiThread override fun onDisconnected(miner: Miner) {
-        adapter.update(miner)
-    }
-
-    @UiThread
-    override fun onStartedMiningWith(miner: Miner) {
-        adapter.update(miner)
-    }
-
-    @UiThread
-    override fun onStoppedMiningWith(miner: Miner) {
         adapter.update(miner)
     }
 
@@ -288,12 +278,12 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                         true
                     }
                     R.id.action_turn_off_miner -> {
-                        val miner = getModel().miners.markAsOff(miner)
+                        val miner = getModel().miners.turnOff(miner)
                         getController().stopServiceFor(miner)
                         true
                     }
                     R.id.action_turn_on_miner -> {
-                        val miner = getModel().miners.markAsOn(miner)
+                        val miner = getModel().miners.turnOn(miner)
                         getController().startServiceFor(miner)
                         true
                     }

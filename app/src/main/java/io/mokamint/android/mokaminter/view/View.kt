@@ -54,20 +54,6 @@ interface View {
     @UiThread fun onBalanceChanged(miner: Miner) {}
 
     /**
-     * Called when mining with the given miner starts.
-     *
-     * @param miner the miner whose mining started
-     */
-    @UiThread fun onStartedMiningWith(miner: Miner) {}
-
-    /**
-     * Called when mining with the given miner stops.
-     *
-     * @param miner the miner whose mining stopped
-     */
-    @UiThread fun onStoppedMiningWith(miner: Miner) {}
-
-    /**
      * Called when the app is ready to create the plot for the
      * given miner but needs the authorization of the user.
      *

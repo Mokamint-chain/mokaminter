@@ -124,7 +124,7 @@ class Miners(private val mvc: MVC) {
      * @return the miner information derived from {@code miner}, but where
      *         it has been taken note that the miner is on now
      */
-    fun markAsOn(miner: Miner): Miner {
+    fun turnOn(miner: Miner): Miner {
         synchronized (miners) {
             if (!miner.isOn && miners.remove(miner)) {
                 val result = miner.turnedOn()
@@ -147,7 +147,7 @@ class Miners(private val mvc: MVC) {
      * @return the miner information derived from {@code miner}, but where
      *         it has been taken note that the miner is off now
      */
-    fun markAsOff(miner: Miner): Miner {
+    fun turnOff(miner: Miner): Miner {
         synchronized (miners) {
             if (miner.isOn && miners.remove(miner)) {
                 val result = miner.turnedOff()
@@ -170,7 +170,7 @@ class Miners(private val mvc: MVC) {
      * @return the miner information derived from {@code miner}, but where
      *         the new balance of the miner has been taken note of
      */
-    fun markHasBalance(miner: Miner, balance: BigInteger): Miner {
+    fun setBalance(miner: Miner, balance: BigInteger): Miner {
         synchronized (miners) {
             if (miner.balance != balance && miners.remove(miner)) {
                 val result = miner.withBalance(balance)

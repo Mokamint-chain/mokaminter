@@ -131,14 +131,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         adapter.update(miner)
     }
 
-    override fun onMiningPaused() {
-        context.invalidateOptionsMenu()
-    }
-
-    override fun onMiningUnpaused() {
-        context.invalidateOptionsMenu()
-    }
-
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
         private var miners = emptyArray<Miner>()
 

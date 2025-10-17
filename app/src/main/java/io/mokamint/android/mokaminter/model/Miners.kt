@@ -26,9 +26,6 @@ class Miners(private val mvc: MVC) {
     @GuardedBy("itself")
     private val miners = TreeSet<Miner>()
 
-    @GuardedBy("itself")
-    private val currentlyUsedForMining = HashSet<Miner>()
-
     private val mainScope = CoroutineScope(Dispatchers.Main)
 
     companion object {
@@ -191,28 +188,6 @@ class Miners(private val mvc: MVC) {
         }
     }
 
-    fun startedMiningWith(miner: Miner) {
-        synchronized (currentlyUsedForMining) {
-            currentlyUsedForMining.add(miner)
-        }
-
-        mainScope.launch { mvc.view?.onStartedMiningWith(miner) }
-    }
-
-    fun stoppedMiningWith(miner: Miner) {
-        synchronized (currentlyUsedForMining) {
-            currentlyUsedForMining.remove(miner)
-        }
-
-        mainScope.launch { mvc.view?.onStoppedMiningWith(miner) }
-    }
-
-    fun isCurrentlyUsedForMining(miner: Miner): Boolean {
-        synchronized (currentlyUsedForMining) {
-            return currentlyUsedForMining.contains(miner)
-        }
-    }
-
     /**
      * Yields a snapshot of the miners in this container, in increasing order.
      *
@@ -220,7 +195,7 @@ class Miners(private val mvc: MVC) {
      */
     fun snapshot(): Array<Miner> {
         synchronized (miners) {
-            return miners.stream().toArray { i -> arrayOfNulls(i) }
+            return miners.toTypedArray()
         }
     }
 

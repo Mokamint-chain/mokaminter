@@ -14,9 +14,5 @@ class StopMiningReceiver: BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "User stop request received")
-
-        val mvc = context.applicationContext as MVC
-        // we stop the service
-        MiningServices.stop(mvc)
     }
 }

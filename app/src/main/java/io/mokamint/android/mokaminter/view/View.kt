@@ -68,16 +68,6 @@ interface View {
     @UiThread fun onStoppedMiningWith(miner: Miner) {}
 
     /**
-     * Called when mining has been paused.
-     */
-    @UiThread fun onMiningPaused() {}
-
-    /**
-     * Called when mining has been unpaused.
-     */
-    @UiThread fun onMiningUnpaused() {}
-
-    /**
      * Called when the app is ready to create the plot for the
      * given miner but needs the authorization of the user.
      *

@@ -16,7 +16,6 @@ import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
 import java.util.Optional
@@ -35,7 +34,6 @@ class Controller {
     private val mvc: MVC
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
-    private val defaultScope = CoroutineScope(Dispatchers.Default)
     private val working = AtomicInteger(0)
 
     /**
@@ -50,14 +48,14 @@ class Controller {
         private val TAG = Controller::class.simpleName
 
         /**
-         * The interval, in milliseconds, between successive sanity checks.
+         * The interval, in milliseconds, between successive
+         * background fetches of the balances of the miners.
          */
-        private const val SANITY_CHECK_INTERVAL = 600_000L // every 10 minutes
+        private const val BALANCE_FETCH_INTERVAL = 60 * 60 * 1000L // every hour
     }
 
     constructor(mvc: MVC) {
         this.mvc = mvc
-        defaultScope.launch { sanityCheck() }
     }
 
     fun startServiceFor(miner: Miner) {
@@ -100,28 +98,8 @@ class Controller {
         }
     }
 
-    /**
-     * Recreates services that have been closed and fetches the balances
-     * of the miners, if currently needed by the controller.
-     */
-    private suspend fun sanityCheck() {
-        while (true) {
-            Log.d(TAG, "sanityCheck")
-            delay(SANITY_CHECK_INTERVAL)
-
-            // we only request the balances if the controller asks so,
-            // in order to reduce network congestion
-            if (isRequestingBalances())
-                MiningServices.fetchBalances(mvc)
-        }
-    }
-
     fun isWorking(): Boolean {
         return working.get() > 0
-    }
-
-    fun requestPauseMining() {
-        MiningServices.stop(mvc)
     }
 
     fun startRequestingBalances() {
@@ -139,7 +117,7 @@ class Controller {
     fun startServiceForAllMiners() {
         //safeRunAsIO {
             mvc.model.miners.reload()
-                .filter { miner ->  miner.isOn }
+                .filter { miner ->  miner.isOn && miner.hasPlotReady }
                 .forEach { miner ->  startServiceFor(miner) }
             mainScope.launch { mvc.view?.onMinersReloaded() }
             Log.i(TAG, "Reloaded the list of miners")
@@ -150,6 +128,8 @@ class Controller {
 
     fun requestDelete(miner: Miner) {
         safeRunAsIO {
+            stopServiceFor(miner)
+
             val filename = "${miner.uuid}.plot"
 
             if (mvc.deleteFile(filename))
@@ -158,8 +138,6 @@ class Controller {
                 Log.w(TAG, "Failed deleting $filename")
 
             mvc.model.miners.remove(miner)
-
-            MiningServices.update(mvc)
         }
     }
 
@@ -224,11 +202,10 @@ class Controller {
             }
 
             // we replace the miner with an identical card, but whose "has plot" flag is true
-            mvc.model.miners.markHasPlot(miner)
+            val miner = mvc.model.miners.markHasPlot(miner)
             Log.i(TAG, "Completed creation of $path for miner ${miner.miningSpecification.name}")
             mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
-
-            MiningServices.update(mvc)
+            startServiceFor(miner)
         }
     }
 

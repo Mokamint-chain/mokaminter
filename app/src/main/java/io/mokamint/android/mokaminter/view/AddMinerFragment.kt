@@ -164,11 +164,11 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
 
         if (binding.createKey.isChecked) {
             val password = binding.keyPairPassword.text.toString()
-            uuid = getController().requestCreationOfMiner(uri, size, entropy, password, null)
+            uuid = getController().onMinerCreationRequested(uri, size, entropy, password, null)
         }
         else if (binding.useExistingKey.isChecked) {
             val publicKeyBase58 = binding.publicKeyBase58.text.toString()
-            uuid = getController().requestCreationOfMiner(uri, size, null, null, publicKeyBase58)
+            uuid = getController().onMinerCreationRequested(uri, size, null, null, publicKeyBase58)
         }
         else if (binding.useExistingKeyPair.isChecked) {
             val words = insertWordsViews.map { view -> view.text.toString() }.toTypedArray()
@@ -176,7 +176,7 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             try {
                 val entropy = Entropies.of(BIP39Mnemonics.of(words).bytes)
                 val password = binding.keyPairPassword.text.toString()
-                uuid = getController().requestCreationOfMiner(uri, size, entropy, password, null)
+                uuid = getController().onMinerCreationRequested(uri, size, entropy, password, null)
             }
             catch (e: IllegalArgumentException) {
                 notifyUser(getString(R.string.wrong_bip39_phrase, e.message))

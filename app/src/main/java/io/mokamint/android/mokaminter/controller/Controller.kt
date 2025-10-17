@@ -55,15 +55,16 @@ class Controller {
         this.mvc = mvc
     }
 
-    fun startServiceFor(miner: Miner) {
+    private fun startServiceFor(miner: Miner) {
         services.computeIfAbsent(miner) { m -> createService(m) };
     }
 
-    fun stopServiceFor(miner: Miner) {
+    private fun stopServiceFor(miner: Miner) {
         // TODO: close it in a work manager because it might be slow
         services.remove(miner)?.close()
     }
 
+    @UiThread
     fun hasConnectedServiceFor(miner: Miner): Boolean {
         return services.get(miner)?.isConnected == true
     }
@@ -95,32 +96,43 @@ class Controller {
         }
     }
 
+    @UiThread
     fun isWorking(): Boolean {
         return working.get() > 0
     }
 
     @UiThread
-    fun startServiceForAllMiners() {
+    fun onResumeRequested() {
         mvc.model.miners.reload()
             .filter { miner ->  miner.isOn && miner.hasPlotReady }
             .forEach { miner ->  startServiceFor(miner) }
-        mainScope.launch { mvc.view?.onMinersReloaded() }
+        mvc.view?.onMinersReloaded()
         Log.i(TAG, "Reloaded the list of miners")
     }
 
-    fun requestDelete(miner: Miner) {
-        safeRunAsIO {
-            stopServiceFor(miner)
+    @UiThread
+    fun onDeleteRequested(miner: Miner) {
+        stopServiceFor(miner)
+        mvc.model.miners.remove(miner)
 
+        safeRunAsIO {
             val filename = "${miner.uuid}.plot"
 
             if (mvc.deleteFile(filename))
                 Log.i(TAG, "Deleted $filename")
             else
                 Log.w(TAG, "Failed deleting $filename")
-
-            mvc.model.miners.remove(miner)
         }
+    }
+
+    @UiThread
+    fun onTurnOnRequested(miner: Miner) {
+        startServiceFor(miner)
+    }
+
+    @UiThread
+    fun onTurnOffRequested(miner: Miner) {
+        stopServiceFor(miner)
     }
 
     /**
@@ -128,7 +140,8 @@ class Controller {
      *
      * @return the identifier of the miner whose creation starts with this call
      */
-    fun requestCreationOfMiner(uri: URI, size: Long, entropy: Entropy?, password: String?, publicKeyBase58: String?): UUID {
+    @UiThread
+    fun onMinerCreationRequested(uri: URI, size: Long, entropy: Entropy?, password: String?, publicKeyBase58: String?): UUID {
         val uuid = UUID.randomUUID()
 
         safeRunAsIO {
@@ -169,7 +182,8 @@ class Controller {
         return uuid
     }
 
-    fun requestCreationOfPlotFor(miner: Miner) {
+    @UiThread
+    fun onPlotCreationRequested(miner: Miner) {
         safeRunAsIO {
             val filename = "${miner.uuid}.plot"
             val path = mvc.filesDir.toPath().resolve(filename)

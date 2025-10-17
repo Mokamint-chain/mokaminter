@@ -44,7 +44,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     override fun onResume() {
-        getController().startServiceForAllMiners()
+        getController().onResumeRequested()
         super.onResume()
     }
 
@@ -271,12 +271,12 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                     }
                     R.id.action_turn_off_miner -> {
                         val miner = getModel().miners.turnOff(miner)
-                        getController().stopServiceFor(miner)
+                        getController().onTurnOffRequested(miner)
                         true
                     }
                     R.id.action_turn_on_miner -> {
                         val miner = getModel().miners.turnOn(miner)
-                        getController().startServiceFor(miner)
+                        getController().onTurnOnRequested(miner)
                         true
                     }
                     else -> false

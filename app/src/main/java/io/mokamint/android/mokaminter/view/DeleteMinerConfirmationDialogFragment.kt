@@ -37,7 +37,7 @@ class DeleteMinerConfirmationDialogFragment: AbstractDialogFragment() {
                     miner.miningSpecification.name
                 ))
             .setNegativeButton(R.string.dismiss) { _, _ -> }
-            .setPositiveButton(R.string.delete) { _, _ -> getController().requestDelete(miner) }
+            .setPositiveButton(R.string.delete) { _, _ -> getController().onDeleteRequested(miner) }
             .create()
     }
 }

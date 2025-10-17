@@ -50,7 +50,7 @@ class CreatePlotConfirmationDialogFragment: AbstractDialogFragment() {
                     totalSize / 1_000_000_000.0 // we express the size in gigabytes
                 ))
             .setNegativeButton(R.string.dismiss) { _, _ -> }
-            .setPositiveButton(R.string.create) { _, _ -> getController().requestCreationOfPlotFor(miner) }
+            .setPositiveButton(R.string.create) { _, _ -> getController().onPlotCreationRequested(miner) }
             .create()
     }
 }

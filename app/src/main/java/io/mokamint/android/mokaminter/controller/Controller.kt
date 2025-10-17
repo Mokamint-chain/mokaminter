@@ -59,11 +59,6 @@ class Controller {
         services.computeIfAbsent(miner) { m -> createService(m) };
     }
 
-    private fun stopServiceFor(miner: Miner) {
-        // TODO: close it in a work manager because it might be slow
-        services.remove(miner)?.close()
-    }
-
     @UiThread
     fun hasConnectedServiceFor(miner: Miner): Boolean {
         return services.get(miner)?.isConnected == true
@@ -103,21 +98,24 @@ class Controller {
 
     @UiThread
     fun onResumeRequested() {
-        mvc.model.miners.reload()
-            .filter { miner ->  miner.isOn && miner.hasPlotReady }
-            .forEach { miner ->  startServiceFor(miner) }
-        mvc.view?.onMinersReloaded()
-        Log.i(TAG, "Reloaded the list of miners")
+        safeRunAsIO {
+            mvc.model.miners.reload()
+                .filter { miner -> miner.isOn && miner.hasPlotReady }
+                .forEach { miner -> startServiceFor(miner) }
+            mvc.view?.onMinersReloaded()
+            Log.i(TAG, "Reloaded the list of miners")
+        }
     }
 
     @UiThread
     fun onDeleteRequested(miner: Miner) {
-        stopServiceFor(miner)
         mvc.model.miners.remove(miner)
+        val service = services.remove(miner)
 
         safeRunAsIO {
-            val filename = "${miner.uuid}.plot"
+            service?.close()
 
+            val filename = "${miner.uuid}.plot"
             if (mvc.deleteFile(filename))
                 Log.i(TAG, "Deleted $filename")
             else
@@ -132,7 +130,11 @@ class Controller {
 
     @UiThread
     fun onTurnOffRequested(miner: Miner) {
-        stopServiceFor(miner)
+        services.remove(miner)?.let { it ->
+            safeRunAsIO {
+                it.close()
+            }
+        }
     }
 
     /**

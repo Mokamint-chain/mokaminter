@@ -45,15 +45,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     override fun onResume() {
         getController().startServiceForAllMiners()
-        // we request to fetch the balances only when the fragment is visible,
-        // to reduce network congestion
-        getController().startRequestingBalances()
         super.onResume()
-    }
-
-    override fun onStop() {
-        getController().stopRequestingBalances()
-        super.onStop()
     }
 
     @Deprecated("Deprecated in Java")

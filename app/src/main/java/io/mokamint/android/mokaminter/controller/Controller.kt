@@ -1,6 +1,7 @@
 package io.mokamint.android.mokaminter.controller
 
 import android.util.Log
+import androidx.annotation.UiThread
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.Base58ConversionException
 import io.hotmoka.crypto.api.Entropy
@@ -23,7 +24,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.Volatile
 
 /**
  * The controller of the MVC triple.
@@ -40,9 +40,6 @@ class Controller {
      * A map from active miners to their servicing object.
      */
     private val services = ConcurrentHashMap<Miner, ReconnectingMinerService>()
-
-    @Volatile
-    private var isRequestingBalances = false
 
     companion object {
         private val TAG = Controller::class.simpleName
@@ -102,28 +99,13 @@ class Controller {
         return working.get() > 0
     }
 
-    fun startRequestingBalances() {
-        isRequestingBalances = true
-    }
-
-    fun stopRequestingBalances() {
-        isRequestingBalances = false
-    }
-
-    fun isRequestingBalances(): Boolean {
-        return isRequestingBalances
-    }
-
+    @UiThread
     fun startServiceForAllMiners() {
-        //safeRunAsIO {
-            mvc.model.miners.reload()
-                .filter { miner ->  miner.isOn && miner.hasPlotReady }
-                .forEach { miner ->  startServiceFor(miner) }
-            mainScope.launch { mvc.view?.onMinersReloaded() }
-            Log.i(TAG, "Reloaded the list of miners")
-            //MiningServices.update(mvc)
-            //MiningServices.fetchBalances(mvc)
-        //}
+        mvc.model.miners.reload()
+            .filter { miner ->  miner.isOn && miner.hasPlotReady }
+            .forEach { miner ->  startServiceFor(miner) }
+        mainScope.launch { mvc.view?.onMinersReloaded() }
+        Log.i(TAG, "Reloaded the list of miners")
     }
 
     fun requestDelete(miner: Miner) {

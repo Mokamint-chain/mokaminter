@@ -3,6 +3,7 @@ package io.mokamint.android.mokaminter.view
 import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -69,17 +70,17 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
     }
 
-    @UiThread override fun onMinersReloaded() {
-        adapter.update()
+    @UiThread override fun onMinersReloaded(miners: Array<Miner>) {
+        adapter.update(miners)
     }
 
-    @UiThread override fun onDeleted(deleted: Miner) {
-        adapter.update()
+    @UiThread override fun onDeleted(deleted: Miner, miners: Array<Miner>) {
+        adapter.update(miners)
         notifyUser(getString(R.string.deleted_miner, deleted.miningSpecification.name))
     }
 
-    @UiThread override fun onAdded(added: Miner) {
-        adapter.update()
+    @UiThread override fun onAdded(added: Miner, miners: Array<Miner>) {
+        adapter.update(miners)
         notifyUser(getString(R.string.added_miner, added.miningSpecification.name))
     }
 
@@ -122,8 +123,9 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private val progress = HashMap<Miner, Int>()
 
         @SuppressLint("NotifyDataSetChanged")
-        fun update() {
-            miners = getModel().miners.snapshot()
+        fun update(miners: Array<Miner>) {
+            this.miners = miners
+            miners.forEach { miner ->  Log.d(TAG, "${miner.hasPlotReady}") }
 
             if (miners.isEmpty()) {
                 // if there are no miners, we create a quick
@@ -143,62 +145,30 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             // if the miner whose plot is being created is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
+            if (pos >= 0)
                 // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
                 // that does not perform any animation on the updated item; by calling
                 // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
                 notifyItemChanged(pos, percent)
-            }
         }
 
         fun updateBalance(miner: Miner) {
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
+            if (pos >= 0)
                 // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
                 // that does not perform any animation on the updated item; by calling
                 // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
                 notifyItemChanged(pos, miner.balance)
-            }
-        }
-
-        fun turnOn(miner: Miner) {
-            // if the turned on miner is among those in this adapter,
-            // we require a redraw of its item only
-            val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
-                // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
-                // that does not perform any animation on the updated item; by calling
-                // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
-                notifyItemChanged(pos, true)
-            }
-        }
-
-        fun turnOff(miner: Miner) {
-            // if the turned on miner is among those in this adapter,
-            // we require a redraw of its item only
-            val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
-                // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
-                // that does not perform any animation on the updated item; by calling
-                // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
-                notifyItemChanged(pos, false)
-            }
         }
 
         fun update(miner: Miner) {
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
+            if (pos >= 0)
                 notifyItemChanged(pos)
-            }
         }
 
         fun progressStops(miner: Miner) {
@@ -270,12 +240,10 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                         true
                     }
                     R.id.action_turn_off_miner -> {
-                        val miner = getModel().miners.turnOff(miner)
                         getController().onTurnOffRequested(miner)
                         true
                     }
                     R.id.action_turn_on_miner -> {
-                        val miner = getModel().miners.turnOn(miner)
                         getController().onTurnOnRequested(miner)
                         true
                     }

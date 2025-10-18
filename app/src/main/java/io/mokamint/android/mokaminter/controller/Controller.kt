@@ -1,6 +1,7 @@
 package io.mokamint.android.mokaminter.controller
 
 import android.util.Log
+import androidx.annotation.GuardedBy
 import androidx.annotation.UiThread
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.Base58ConversionException
@@ -17,6 +18,7 @@ import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.FileNotFoundException
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
 import java.util.Optional
@@ -37,6 +39,11 @@ class Controller {
     private val working = AtomicInteger(0)
 
     /**
+     * A lock used to serialize modifications to the set of miners.
+     */
+    private val minersLock = Object()
+
+    /**
      * A map from active miners to their servicing object.
      */
     private val services = ConcurrentHashMap<Miner, ReconnectingMinerService>()
@@ -55,8 +62,14 @@ class Controller {
         this.mvc = mvc
     }
 
+    @GuardedBy("this.minersLock")
     private fun startServiceFor(miner: Miner) {
         services.computeIfAbsent(miner) { m -> createService(m) };
+    }
+
+    @GuardedBy("this.minersLock")
+    private fun stopServiceFor(miner: Miner) {
+        services.remove(miner)?.close()
     }
 
     @UiThread
@@ -64,6 +77,7 @@ class Controller {
         return services.get(miner)?.isConnected == true
     }
 
+    @GuardedBy("this.minersLock")
     private fun createService(miner: Miner): ReconnectingMinerService {
         val filename = "${miner.uuid}.plot"
         val path = mvc.filesDir.toPath().resolve(filename)
@@ -99,40 +113,54 @@ class Controller {
     @UiThread
     fun onResumeRequested() {
         safeRunAsIO {
-            mvc.model.miners.reload()
-                .filter { miner -> miner.isOn && miner.hasPlotReady }
-                .forEach { miner -> startServiceFor(miner) }
-            mvc.view?.onMinersReloaded()
-            Log.i(TAG, "Reloaded the list of miners")
+            synchronized (minersLock) {
+                mvc.model.miners.reload()
+                    .filter { miner -> miner.isOn && miner.hasPlotReady }
+                    .forEach { miner -> startServiceFor(miner) }
+
+                Log.i(TAG, "Reloaded the list of miners")
+                mainScope.launch { mvc.view?.onMinersReloaded(mvc.model.miners.snapshot()) }
+            }
         }
     }
 
     @UiThread
     fun onDeleteRequested(miner: Miner) {
-        mvc.model.miners.remove(miner)
-        val service = services.remove(miner)
-
         safeRunAsIO {
-            service?.close()
-
-            val filename = "${miner.uuid}.plot"
-            if (mvc.deleteFile(filename))
-                Log.i(TAG, "Deleted $filename")
-            else
-                Log.w(TAG, "Failed deleting $filename")
+            synchronized (minersLock) {
+                if (mvc.model.miners.remove(miner)) {
+                    stopServiceFor(miner)
+                    deletePlotOf(miner)
+                    mainScope.launch { mvc.view?.onDeleted(miner, mvc.model.miners.snapshot()) }
+                }
+            }
         }
+    }
+
+    private fun deletePlotOf(miner: Miner) {
+        val filename = "${miner.uuid}.plot"
+        if (mvc.deleteFile(filename))
+            Log.i(TAG, "Deleted $filename")
+        else
+            Log.w(TAG, "Failed deleting $filename")
     }
 
     @UiThread
     fun onTurnOnRequested(miner: Miner) {
-        startServiceFor(miner)
+        safeRunAsIO {
+            synchronized (minersLock) {
+                if (!miner.isOn && mvc.model.miners.turnOn(miner))
+                    startServiceFor(miner)
+            }
+        }
     }
 
     @UiThread
     fun onTurnOffRequested(miner: Miner) {
-        services.remove(miner)?.let { it ->
-            safeRunAsIO {
-                it.close()
+        safeRunAsIO {
+            synchronized (minersLock) {
+                if (miner.isOn && mvc.model.miners.turnOff(miner))
+                    stopServiceFor(miner)
             }
         }
     }
@@ -172,7 +200,8 @@ class Controller {
             else if (entropy != null && password != null) {
                 val signatureForDeadlines = miningSpecification.signatureForDeadlines
                 miner = Miner(uuid, miningSpecification, uri, size,
-                    Base58.toBase58String(signatureForDeadlines.encodingOf(entropy.keys(password, signatureForDeadlines).public)))
+                    Base58.toBase58String(signatureForDeadlines.encodingOf
+                        (entropy.keys(password, signatureForDeadlines).public)))
                 Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
                 mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
             }
@@ -189,21 +218,40 @@ class Controller {
         safeRunAsIO {
             val filename = "${miner.uuid}.plot"
             val path = mvc.filesDir.toPath().resolve(filename)
-            Log.i(TAG, "Started creation of $path for miner ${miner.miningSpecification.name}")
             mainScope.launch { mvc.view?.onPlotCreationStarted(miner) }
 
-            mvc.model.miners.add(miner)
-
-            Plots.create(path, miner.getProlog(), 0, miner.size, miner.miningSpecification.hashingForDeadlines) { percent ->
-                mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
-                Log.i(TAG, "Created $percent% of plot $path")
+            synchronized (minersLock) {
+                mvc.model.miners.add(miner)
+                mainScope.launch { mvc.view?.onAdded(miner, mvc.model.miners.snapshot()) }
             }
 
-            // we replace the miner with an identical card, but whose "has plot" flag is true
-            val miner = mvc.model.miners.markHasPlot(miner)
-            Log.i(TAG, "Completed creation of $path for miner ${miner.miningSpecification.name}")
-            mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
-            startServiceFor(miner)
+            // we split the synchronization on minersLock in order to allow operating
+            // on the miners during the (potentially slow) creation of the plot
+
+            Log.i(TAG, "Started creation of $path for miner $miner")
+
+            try {
+                Plots.create(path, miner.getProlog(), 0, miner.size,
+                    miner.miningSpecification.hashingForDeadlines
+                ) { percent ->
+                    mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
+                    Log.i(TAG, "Created $percent% of plot $path")
+                }
+            }
+            catch (_: FileNotFoundException) {
+                // the miner has been deleted before the complete creation of its plot
+                Log.w(TAG, "Miner $miner has been deleted before the full creation of its plot!")
+            }
+
+            Log.i(TAG, "Completed creation of $path for miner $miner")
+
+            synchronized (minersLock) {
+                if (!miner.hasPlotReady && mvc.model.miners.markHasPlot(miner)) {
+                    mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
+                    startServiceFor(miner)
+                }
+                else deletePlotOf(miner)
+            }
         }
     }
 

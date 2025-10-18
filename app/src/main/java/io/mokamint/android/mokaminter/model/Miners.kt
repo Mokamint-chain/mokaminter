@@ -23,7 +23,6 @@ class Miners(private val mvc: MVC) {
     /**
      * The ordered set of miners contained in this container.
      */
-    @GuardedBy("itself")
     private val miners = TreeSet<Miner>()
 
     private val mainScope = CoroutineScope(Dispatchers.Main)
@@ -43,24 +42,22 @@ class Miners(private val mvc: MVC) {
      * Loads the set of miners from the XML file on disk.
      */
     fun reload(): Array<Miner> {
-        synchronized (miners) {
-            miners.clear()
+        miners.clear()
 
-            try {
-                mvc.openFileInput(FILENAME).use {
-                    val parser = Xml.newPullParser()
-                    parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-                    parser.setInput(it, null)
-                    parser.nextTag()
-                    readMiners(parser)
-                }
-            } catch (_: FileNotFoundException) {
-                // this is fine: initially the file of the miners is missing
-                Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
+        try {
+            mvc.openFileInput(FILENAME).use {
+                val parser = Xml.newPullParser()
+                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+                parser.setInput(it, null)
+                parser.nextTag()
+                readMiners(parser)
             }
-
-            return miners.toTypedArray()
+        } catch (_: FileNotFoundException) {
+            // this is fine: initially the file of the miners is missing
+            Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
         }
+
+        return miners.toTypedArray()
     }
 
     /**
@@ -70,12 +67,9 @@ class Miners(private val mvc: MVC) {
      * @param miner the miner to add
      */
     fun add(miner: Miner) {
-        synchronized (miners) {
-            if (miners.add(miner)) {
-                writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onAdded(miner) }
-                Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
-            }
+        if (miners.add(miner)) {
+            writeIntoInternalStorage()
+            Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
         }
     }
 
@@ -84,15 +78,15 @@ class Miners(private val mvc: MVC) {
      * If it is not contained in this container, this method does nothing.
      *
      * @param miner the miner to remove
+     * @return true if and only if the miner was in this set of miners
      */
-    fun remove(miner: Miner) {
-        synchronized (miners) {
-            if (miners.remove(miner)) {
-                writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onDeleted(miner) }
-                Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
-            }
+    fun remove(miner: Miner): Boolean {
+        if (miners.remove(miner)) {
+            writeIntoInternalStorage()
+            Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
+            return true
         }
+        else return false
     }
 
     /**
@@ -100,19 +94,20 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return the miner information derived from {@code miner}, but where
-     *         it has been taken note that the miner has a plot now
+     * @return true if and only if the miner was in this set of miners
      */
-    fun markHasPlot(miner: Miner): Miner {
-        synchronized (miners) {
-            if (!miner.hasPlotReady && miners.remove(miner)) {
-                val result = miner.withPlotReady()
-                miners.add(result)
+    fun markHasPlot(miner: Miner): Boolean {
+        try {
+            val miner = miners.first { m -> m == miner }
+            if (!miner.hasPlotReady) {
+                miner.markPlotReady()
                 writeIntoInternalStorage()
-                return result
             }
-            else
-                return miner
+
+            return true
+        }
+        catch (_: NoSuchElementException) {
+            return false
         }
     }
 
@@ -121,22 +116,20 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return the miner information derived from {@code miner}, but where
-     *         it has been taken note that the miner is on now
+     * @return true if and only if the miner was in this set of miners
      */
-    fun turnOn(miner: Miner): Miner {
-        synchronized (miners) {
-            if (!miner.isOn && miners.remove(miner)) {
-                val result = miner.turnedOn()
-                miners.add(result)
+    fun turnOn(miner: Miner): Boolean {
+        if (miners.contains(miner)) {
+            if (!miner.isOn) {
+                miner.isOn = true
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onTurnedOn(result) }
-                Log.i(TAG, "Turned on miner ${miner.miningSpecification.name}")
-                return result
+                mainScope.launch { mvc.view?.onTurnedOn(miner) }
+                Log.i(TAG, "Turned on miner $miner")
             }
-            else
-                return miner
+
+            return true
         }
+        else return false
     }
 
     /**
@@ -144,22 +137,20 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return the miner information derived from {@code miner}, but where
-     *         it has been taken note that the miner is off now
+     * @return true if and only if the miner was in this set of miners
      */
-    fun turnOff(miner: Miner): Miner {
-        synchronized (miners) {
-            if (miner.isOn && miners.remove(miner)) {
-                val result = miner.turnedOff()
-                miners.add(result)
+    fun turnOff(miner: Miner): Boolean {
+        if (miners.contains(miner)) {
+            if (miner.isOn) {
+                miner.isOn = false
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onTurnedOff(result) }
-                Log.i(TAG, "Turned off miner ${miner.miningSpecification.name}")
-                return result
+                mainScope.launch { mvc.view?.onTurnedOff(miner) }
+                Log.i(TAG, "Turned off miner $miner")
             }
-            else
-                return miner
+
+            return true
         }
+        else return false
     }
 
     /**
@@ -167,25 +158,21 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return the miner information derived from {@code miner}, but where
-     *         the new balance of the miner has been taken note of
+     * @param balance the new balance to set for {@code miner}
+     * @return true if and only if the miner was in this set of miners
      */
-    fun setBalance(miner: Miner, balance: BigInteger): Miner {
-        synchronized (miners) {
-            if (miner.balance != balance && miners.remove(miner)) {
-                val result = miner.withBalance(balance)
-                miners.add(result)
+    fun setBalance(miner: Miner, balance: BigInteger): Boolean {
+        if (miners.contains(miner)) {
+            if (miner.balance != balance) {
+                miner.balance = balance
                 writeIntoInternalStorage()
-
-                mainScope.launch {
-                    mvc.view?.onBalanceChanged(result)
-                }
-
-                return result
+                mainScope.launch { mvc.view?.onBalanceChanged(miner) }
+                Log.i(TAG, "Updated balance of miner $miner to $balance")
             }
-            else
-                return miner
+
+            return true
         }
+        else return false
     }
 
     /**
@@ -194,12 +181,9 @@ class Miners(private val mvc: MVC) {
      * @return the snapshot of the miners, in increasing order
      */
     fun snapshot(): Array<Miner> {
-        synchronized (miners) {
-            return miners.toTypedArray()
-        }
+        return miners.toTypedArray()
     }
 
-    @GuardedBy("this.miners")
     private fun readMiners(parser: XmlPullParser) {
         parser.require(XmlPullParser.START_TAG, null, MINERS_TAG)
 
@@ -227,7 +211,6 @@ class Miners(private val mvc: MVC) {
     /**
      * Writes this set of miners in the internal storage of the app, as an XML file.
      */
-    @GuardedBy("this.miners")
     private fun writeIntoInternalStorage() {
         mvc.openFileOutput(FILENAME, Context.MODE_PRIVATE).use {
             val serializer = Xml.newSerializer()

@@ -2,6 +2,7 @@ package io.mokamint.android.mokaminter.model
 
 import android.os.Parcel
 import android.os.Parcelable
+import android.util.Log
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.HashingAlgorithms
 import io.hotmoka.crypto.SignatureAlgorithms
@@ -60,18 +61,19 @@ class Miner: Comparable<Miner>, Parcelable {
     /**
      * The balance of the miner.
      */
-    val balance: BigInteger
+    var balance: BigInteger
 
     /**
      * True if and only if the plot for this miner has been fully created and is
      * available in the local storage of the app.
      */
-    val hasPlotReady: Boolean
+    var hasPlotReady: Boolean
+        private set
 
     /**
      * True if and only if mining with this miner is turned on.
      */
-    val isOn: Boolean
+    var isOn: Boolean
 
     companion object {
         private const val UUID_TAG = "uuid"
@@ -285,20 +287,8 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.endTag(null, tag)
     }
 
-    fun withPlotReady(): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, true, isOn)
-    }
-
-    fun withBalance(balance: BigInteger): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, isOn)
-    }
-
-    fun turnedOn(): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, true)
-    }
-
-    fun turnedOff(): Miner {
-        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, false)
+    fun markPlotReady() {
+        hasPlotReady = true
     }
 
     /**
@@ -519,6 +509,6 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     override fun toString(): String {
-        return "${miningSpecification.name} ($uri)"
+        return "$uuid"
     }
 }

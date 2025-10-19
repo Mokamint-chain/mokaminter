@@ -14,14 +14,16 @@ import android.view.ViewGroup
 import androidx.annotation.UiThread
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
+import androidx.core.view.get
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.databinding.FragmentMinersBinding
 import io.mokamint.android.mokaminter.databinding.MinerCardBinding
 import io.mokamint.android.mokaminter.model.Miner
+import io.mokamint.android.mokaminter.model.MinerStatus
+import io.mokamint.android.mokaminter.model.MinersSnapshot
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
-import androidx.core.view.get
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
@@ -95,7 +97,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     @UiThread override fun onBalanceChanged(miner: Miner) {
-        adapter.updateBalance(miner)
+        adapter.update(miner)
     }
 
     @UiThread override fun onTurnedOn(miner: Miner) {
@@ -115,7 +117,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
-        private var miners = emptyArray<Miner>()
+        private var snapshot = MinersSnapshot.empty()
 
         /**
          * Keeps track of the progress of the creation of the miners.
@@ -124,9 +126,9 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
         @SuppressLint("NotifyDataSetChanged")
         fun update() {
-            this.miners = getModel().miners.snapshot()
+            snapshot = getModel().miners.snapshot()
 
-            if (miners.isEmpty()) {
+            if (snapshot.size() == 0) {
                 // if there are no miners, we create a quick
                 // link for the addition of a new miner, as a hint to the user
                 binding.addMiner.visibility = VISIBLE
@@ -138,40 +140,25 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             notifyDataSetChanged()
         }
 
+        fun update(miner: Miner) {
+            // if the miner whose status has been updated is among those in this adapter,
+            // we require a redraw of its item only
+            val pos = snapshot.indexOf(miner)
+            if (pos >= 0)
+                notifyItemChanged(pos)
+        }
+
         fun progressPlotCreation(miner: Miner, percent: Int) {
             progress.put(miner, percent)
 
             // if the miner whose plot is being created is among those in this adapter,
             // we require a redraw of its item only
-            val pos = miners.indexOf(miner)
+            val pos = snapshot.indexOf(miner)
             if (pos >= 0)
                 // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
                 // that does not perform any animation on the updated item; by calling
                 // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
                 notifyItemChanged(pos, percent)
-        }
-
-        fun updateBalance(miner: Miner) {
-            // if the miner whose balance has been updated is among those in this adapter,
-            // we require a redraw of its item only
-            val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
-                // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
-                // that does not perform any animation on the updated item; by calling
-                // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
-                notifyItemChanged(pos, miner.balance)
-            }
-        }
-
-        fun update(miner: Miner) {
-            // if the miner whose balance has been updated is among those in this adapter,
-            // we require a redraw of its item only
-            val pos = miners.indexOf(miner)
-            if (pos >= 0) {
-                miners[pos] = miner
-                notifyItemChanged(pos)
-            }
         }
 
         fun progressStops(miner: Miner) {
@@ -187,7 +174,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
 
-            fun bindTo(miner: Miner) {
+            fun bindTo(miner: Miner, status: MinerStatus) {
                 if (getController().hasConnectedServiceFor(miner)) {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
                         ContextCompat.getColor(context, R.color.mokamint_bright)
@@ -199,7 +186,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                         ContextCompat.getColor(context, R.color.mokamint_medium)
                     )
 
-                    if (miner.hasPlotReady)
+                    if (status.hasPlotReady)
                         binding.plotSize.text = getString(R.string.miner_card_plot_size, totalNonces(miner))
                     else {
                         val percent = progress[miner] ?: 0
@@ -218,20 +205,21 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 )
                 binding.description.text = miner.miningSpecification.description
                 binding.uri.text = getString(R.string.miner_card_uri, miner.uri)
-                binding.balance.text = getString(R.string.miner_card_balance, miner.balance)
+                binding.balance.text = getString(R.string.miner_card_balance, status.balance)
                 binding.publicKey.text = getString(
                     R.string.miner_card_public_key,
                     miner.publicKeyBase58,
                     miner.miningSpecification.signatureForDeadlines.name + ", base58"
                 )
-                binding.menuButton.setOnClickListener { createMenuForMiner(miner) }
+                binding.menuButton.setOnClickListener { createMenuForMiner(miner, status) }
             }
 
-            private fun createMenuForMiner(miner: Miner) {
+            private fun createMenuForMiner(miner: Miner, status: MinerStatus) {
+                Log.d(TAG, "$status")
                 val popup = PopupMenu(context, binding.menuButton)
                 popup.menuInflater.inflate(R.menu.miner_actions, popup.menu)
-                popup.menu[1].isEnabled = miner.isOn
-                popup.menu[2].isEnabled = miner.hasPlotReady && !miner.isOn
+                popup.menu[1].isEnabled = status.isOn
+                popup.menu[2].isEnabled = status.hasPlotReady && !status.isOn
                 popup.setOnMenuItemClickListener{ item -> clickListenerForMiner(item, miner) }
                 popup.show()
             }
@@ -266,15 +254,15 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
 
         override fun onBindViewHolder(viewHolder: ViewHolder, position: Int, payloads: List<Any?>) {
-            viewHolder.bindTo(miners[position])
+            viewHolder.bindTo(snapshot.getMiner(position), snapshot.getStatus(position))
         }
 
         override fun onBindViewHolder(viewHolder: ViewHolder, position: Int) {
-            viewHolder.bindTo(miners[position])
+            viewHolder.bindTo(snapshot.getMiner(position), snapshot.getStatus(position))
         }
 
         override fun getItemCount(): Int {
-            return miners.size
+            return snapshot.size()
         }
     }
 }

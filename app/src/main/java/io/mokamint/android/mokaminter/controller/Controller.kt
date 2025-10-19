@@ -9,6 +9,7 @@ import io.hotmoka.crypto.api.Entropy
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
+import io.mokamint.android.mokaminter.model.MinerStatus
 import io.mokamint.miner.api.MiningSpecification
 import io.mokamint.miner.local.LocalMiners
 import io.mokamint.miner.service.AbstractReconnectingMinerService
@@ -19,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
+import java.math.BigInteger
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
 import java.util.Optional
@@ -32,8 +34,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * @param mvc the MVC triple
  */
-class Controller {
-    private val mvc: MVC
+class Controller(val mvc: MVC) {
+
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)
@@ -56,10 +58,6 @@ class Controller {
          * background fetches of the balances of the miners.
          */
         private const val BALANCE_FETCH_INTERVAL = 60 * 60 * 1000L // every hour
-    }
-
-    constructor(mvc: MVC) {
-        this.mvc = mvc
     }
 
     @GuardedBy("this.minersLock")
@@ -114,9 +112,12 @@ class Controller {
     fun onResumeRequested() {
         safeRunAsIO {
             synchronized (minersLock) {
-                mvc.model.miners.reload()
-                    .filter { miner -> miner.isOn && miner.hasPlotReady }
-                    .forEach { miner -> startServiceFor(miner) }
+                val snapshot = mvc.model.miners.reload()
+                for (pos in 0..<snapshot.size()) {
+                    val status = snapshot.getStatus(pos)
+                    if (status.isOn && status.hasPlotReady)
+                        startServiceFor(snapshot.getMiner(pos))
+                }
 
                 Log.i(TAG, "Reloaded the list of miners")
                 mainScope.launch { mvc.view?.onMinersReloaded() }
@@ -149,7 +150,8 @@ class Controller {
     fun onTurnOnRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                mvc.model.miners.markAsOn(miner)?.let { it -> startServiceFor(it) }
+                if (mvc.model.miners.markAsOn(miner))
+                    startServiceFor(miner)
             }
         }
     }
@@ -158,7 +160,8 @@ class Controller {
     fun onTurnOffRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                mvc.model.miners.markAsOff(miner)?.let { it -> stopServiceFor(miner) }
+                if (mvc.model.miners.markAsOff(miner))
+                    stopServiceFor(miner)
             }
         }
     }
@@ -217,11 +220,16 @@ class Controller {
             val filename = "${miner.uuid}.plot"
             val path = mvc.filesDir.toPath().resolve(filename)
             mainScope.launch { mvc.view?.onPlotCreationStarted(miner) }
+            var status = MinerStatus(BigInteger.ZERO,
+                hasPlotReady = false,
+                isOn = true
+            )
 
             synchronized (minersLock) {
-                mvc.model.miners.add(miner)
-                mainScope.launch { mvc.view?.onAdded(miner) }
+                mvc.model.miners.add(miner, status)
             }
+
+            mainScope.launch { mvc.view?.onAdded(miner) }
 
             // we split the synchronization on minersLock in order to allow operating
             // on the miners during the (potentially slow) creation of the plot
@@ -244,10 +252,9 @@ class Controller {
             Log.i(TAG, "Completed creation of $path for miner $miner")
 
             synchronized (minersLock) {
-                val minerWithPlot = mvc.model.miners.markHasPlot(miner)
-                if (minerWithPlot != null) {
-                    mainScope.launch { mvc.view?.onPlotCreationCompleted(minerWithPlot) }
-                    startServiceFor(minerWithPlot)
+                if (mvc.model.miners.markHasPlot(miner)) {
+                    mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
+                    startServiceFor(miner)
                 }
                 else deletePlotOf(miner)
             }

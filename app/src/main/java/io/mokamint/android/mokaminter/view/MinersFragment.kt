@@ -156,19 +156,23 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
-            if (pos >= 0)
+            if (pos >= 0) {
+                miners[pos] = miner
                 // by passing a dummy payload, we induce a call to onBindViewHolder with a payload,
                 // that does not perform any animation on the updated item; by calling
                 // the simpler notifyItemChanged without payload, an ugly flickering effect occurs
                 notifyItemChanged(pos, miner.balance)
+            }
         }
 
         fun update(miner: Miner) {
             // if the miner whose balance has been updated is among those in this adapter,
             // we require a redraw of its item only
             val pos = miners.indexOf(miner)
-            if (pos >= 0)
+            if (pos >= 0) {
+                miners[pos] = miner
                 notifyItemChanged(pos)
+            }
         }
 
         fun progressStops(miner: Miner) {

@@ -61,19 +61,18 @@ class Miner: Comparable<Miner>, Parcelable {
     /**
      * The balance of the miner.
      */
-    var balance: BigInteger
+    val balance: BigInteger
 
     /**
      * True if and only if the plot for this miner has been fully created and is
      * available in the local storage of the app.
      */
-    var hasPlotReady: Boolean
-        private set
+    val hasPlotReady: Boolean
 
     /**
      * True if and only if mining with this miner is turned on.
      */
-    var isOn: Boolean
+    val isOn: Boolean
 
     companion object {
         private const val UUID_TAG = "uuid"
@@ -287,8 +286,20 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.endTag(null, tag)
     }
 
-    fun markPlotReady() {
-        hasPlotReady = true
+    fun withPlotReady(): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, true, isOn)
+    }
+
+    fun withBalance(balance: BigInteger): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, isOn)
+    }
+
+    fun turnedOn(): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, true)
+    }
+
+    fun turnedOff(): Miner {
+        return Miner(uuid, miningSpecification, uri, size, publicKey, publicKeyBase58, balance, hasPlotReady, false)
     }
 
     /**

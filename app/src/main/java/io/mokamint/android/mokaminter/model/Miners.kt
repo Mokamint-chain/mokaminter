@@ -3,7 +3,6 @@ package io.mokamint.android.mokaminter.model
 import android.content.Context
 import android.util.Log
 import android.util.Xml
-import androidx.annotation.GuardedBy
 import io.mokamint.android.mokaminter.MVC
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,20 +93,24 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return true if and only if the miner was in this set of miners
+     * @return the miner in this set marked as having a plot; yields {@code null} if
+     *         the miner is not contained in this set of miners
      */
-    fun markHasPlot(miner: Miner): Boolean {
+    fun markHasPlot(miner: Miner): Miner? {
         try {
-            val miner = miners.first { m -> m == miner }
+            var miner = miners.first { m -> m == miner }
+
             if (!miner.hasPlotReady) {
-                miner.markPlotReady()
+                miners.remove(miner)
+                miner = miner.withPlotReady()
+                miners.add(miner)
                 writeIntoInternalStorage()
             }
 
-            return true
+            return miner
         }
         catch (_: NoSuchElementException) {
-            return false
+            return null
         }
     }
 
@@ -116,20 +119,27 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return true if and only if the miner was in this set of miners
+     * @return the miner in this set turned on; yields {@code null} if
+     *         the miner is not contained in this set of miners
      */
-    fun turnOn(miner: Miner): Boolean {
-        if (miners.contains(miner)) {
+    fun markAsOn(miner: Miner): Miner? {
+        try {
+            var miner = miners.first { m -> m == miner }
+
             if (!miner.isOn) {
-                miner.isOn = true
+                miners.remove(miner)
+                miner = miner.turnedOn()
+                miners.add(miner)
                 writeIntoInternalStorage()
                 mainScope.launch { mvc.view?.onTurnedOn(miner) }
                 Log.i(TAG, "Turned on miner $miner")
             }
 
-            return true
+            return miner
         }
-        else return false
+        catch (_: NoSuchElementException) {
+            return null
+        }
     }
 
     /**
@@ -137,20 +147,27 @@ class Miners(private val mvc: MVC) {
      *
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
-     * @return true if and only if the miner was in this set of miners
+     * @return the miner in this set turned off; yields {@code null} if
+     *         the miner is not contained in this set of miners
      */
-    fun turnOff(miner: Miner): Boolean {
-        if (miners.contains(miner)) {
+    fun markAsOff(miner: Miner): Miner? {
+        try {
+            var miner = miners.first { m -> m == miner }
+
             if (miner.isOn) {
-                miner.isOn = false
+                miners.remove(miner)
+                miner = miner.turnedOff()
+                miners.add(miner)
                 writeIntoInternalStorage()
                 mainScope.launch { mvc.view?.onTurnedOff(miner) }
                 Log.i(TAG, "Turned off miner $miner")
             }
 
-            return true
+            return miner
         }
-        else return false
+        catch (_: NoSuchElementException) {
+            return null
+        }
     }
 
     /**
@@ -159,20 +176,27 @@ class Miners(private val mvc: MVC) {
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
      * @param balance the new balance to set for {@code miner}
-     * @return true if and only if the miner was in this set of miners
+     * @return the miner in this set with the updated balance; yields {@code null} if
+     *         the miner is not contained in this set of miners
      */
-    fun setBalance(miner: Miner, balance: BigInteger): Boolean {
-        if (miners.contains(miner)) {
+    fun setBalance(miner: Miner, balance: BigInteger): Miner? {
+        try {
+            var miner = miners.first { m -> m == miner }
+
             if (miner.balance != balance) {
-                miner.balance = balance
+                miners.remove(miner)
+                miner = miner.withBalance(balance)
+                miners.add(miner)
                 writeIntoInternalStorage()
                 mainScope.launch { mvc.view?.onBalanceChanged(miner) }
                 Log.i(TAG, "Updated balance of miner $miner to $balance")
             }
 
-            return true
+            return miner
         }
-        else return false
+        catch (_: NoSuchElementException) {
+            return null
+        }
     }
 
     /**

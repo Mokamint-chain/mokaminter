@@ -149,8 +149,7 @@ class Controller {
     fun onTurnOnRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                if (!miner.isOn && mvc.model.miners.turnOn(miner))
-                    startServiceFor(miner)
+                mvc.model.miners.markAsOn(miner)?.let { it -> startServiceFor(it) }
             }
         }
     }
@@ -159,8 +158,7 @@ class Controller {
     fun onTurnOffRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                if (miner.isOn && mvc.model.miners.turnOff(miner))
-                    stopServiceFor(miner)
+                mvc.model.miners.markAsOff(miner)?.let { it -> stopServiceFor(it) }
             }
         }
     }
@@ -246,9 +244,10 @@ class Controller {
             Log.i(TAG, "Completed creation of $path for miner $miner")
 
             synchronized (minersLock) {
-                if (!miner.hasPlotReady && mvc.model.miners.markHasPlot(miner)) {
-                    mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
-                    startServiceFor(miner)
+                val minerWithPlot = mvc.model.miners.markHasPlot(miner)
+                if (minerWithPlot != null) {
+                    mainScope.launch { mvc.view?.onPlotCreationCompleted(minerWithPlot) }
+                    startServiceFor(minerWithPlot)
                 }
                 else deletePlotOf(miner)
             }

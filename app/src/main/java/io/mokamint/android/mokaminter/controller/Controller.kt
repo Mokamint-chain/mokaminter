@@ -119,7 +119,7 @@ class Controller {
                     .forEach { miner -> startServiceFor(miner) }
 
                 Log.i(TAG, "Reloaded the list of miners")
-                mainScope.launch { mvc.view?.onMinersReloaded(mvc.model.miners.snapshot()) }
+                mainScope.launch { mvc.view?.onMinersReloaded() }
             }
         }
     }
@@ -131,7 +131,7 @@ class Controller {
                 if (mvc.model.miners.remove(miner)) {
                     stopServiceFor(miner)
                     deletePlotOf(miner)
-                    mainScope.launch { mvc.view?.onDeleted(miner, mvc.model.miners.snapshot()) }
+                    mainScope.launch { mvc.view?.onDeleted(miner) }
                 }
             }
         }
@@ -158,7 +158,7 @@ class Controller {
     fun onTurnOffRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                mvc.model.miners.markAsOff(miner)?.let { it -> stopServiceFor(it) }
+                mvc.model.miners.markAsOff(miner)?.let { it -> stopServiceFor(miner) }
             }
         }
     }
@@ -220,7 +220,7 @@ class Controller {
 
             synchronized (minersLock) {
                 mvc.model.miners.add(miner)
-                mainScope.launch { mvc.view?.onAdded(miner, mvc.model.miners.snapshot()) }
+                mainScope.launch { mvc.view?.onAdded(miner) }
             }
 
             // we split the synchronization on minersLock in order to allow operating

@@ -29,26 +29,22 @@ interface View {
 
     /**
      * Called when the set of miners has been reloaded.
-     *
-     * @param miners the set of miners that have been reloaded
      */
-    @UiThread fun onMinersReloaded(miners: Array<Miner>) {}
+    @UiThread fun onMinersReloaded() {}
 
     /**
      * Called when a miner has been deleted.
      *
      * @param deleted the deleted miner
-     * @param miners the remaining set of miners
      */
-    @UiThread fun onDeleted(deleted: Miner, miners: Array<Miner>) {}
+    @UiThread fun onDeleted(deleted: Miner) {}
 
     /**
      * Called when a miner has been added.
      *
      * @param added the added miner
-     * @param miners the total set of miners
      */
-    @UiThread fun onAdded(added: Miner, miners: Array<Miner>) {}
+    @UiThread fun onAdded(added: Miner) {}
 
     /**
      * Called when the balance of a miner has changed.

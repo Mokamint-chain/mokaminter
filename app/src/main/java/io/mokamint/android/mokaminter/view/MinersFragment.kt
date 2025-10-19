@@ -70,17 +70,17 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         }
     }
 
-    @UiThread override fun onMinersReloaded(miners: Array<Miner>) {
-        adapter.update(miners)
+    @UiThread override fun onMinersReloaded() {
+        adapter.update()
     }
 
-    @UiThread override fun onDeleted(deleted: Miner, miners: Array<Miner>) {
-        adapter.update(miners)
+    @UiThread override fun onDeleted(deleted: Miner) {
+        adapter.update()
         notifyUser(getString(R.string.deleted_miner, deleted.miningSpecification.name))
     }
 
-    @UiThread override fun onAdded(added: Miner, miners: Array<Miner>) {
-        adapter.update(miners)
+    @UiThread override fun onAdded(added: Miner) {
+        adapter.update()
         notifyUser(getString(R.string.added_miner, added.miningSpecification.name))
     }
 
@@ -123,9 +123,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private val progress = HashMap<Miner, Int>()
 
         @SuppressLint("NotifyDataSetChanged")
-        fun update(miners: Array<Miner>) {
-            this.miners = miners
-            miners.forEach { miner ->  Log.d(TAG, "${miner.hasPlotReady}") }
+        fun update() {
+            this.miners = getModel().miners.snapshot()
 
             if (miners.isEmpty()) {
                 // if there are no miners, we create a quick

@@ -1,9 +1,16 @@
 package io.mokamint.android.mokaminter.controller
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+import android.os.Build
 import android.util.Log
 import androidx.annotation.GuardedBy
 import androidx.annotation.UiThread
+import androidx.core.app.NotificationCompat
+import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
@@ -225,10 +232,13 @@ class Controller(val mvc: MVC) {
         return uuid
     }
 
-    abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): Worker(mvc, workerParams) {
+    abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
-        override fun doWork(): Result {
+        private val notificationManager = mvc.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        override suspend fun doWork(): Result {
             val mvc = applicationContext as MVC
+            setForeground(createForegroundInfo("pippo", mvc))
             val controller = mvc.controller
             controller.working.incrementAndGet()
             controller.mainScope.launch { mvc.view?.onBackgroundStart() }
@@ -249,6 +259,44 @@ class Controller(val mvc: MVC) {
                 if (controller.working.decrementAndGet() == 0)
                     controller.mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
+        }
+
+        private fun createForegroundInfo(progress: String, mvc: MVC): ForegroundInfo {
+            val id = "id"
+            val title = "title"
+            val cancel = "Stop"
+            // This PendingIntent can be used to cancel the worker
+            val intent = WorkManager.getInstance(mvc)
+                .createCancelPendingIntent(getId())
+
+            createChannel(mvc)
+
+            val notification = NotificationCompat.Builder(mvc, id)
+                .setContentTitle(title)
+                .setTicker(title)
+                .setContentText(progress)
+                .setSmallIcon(R.drawable.ic_active_miner)
+                .setOngoing(true)
+                // Add the cancel action to the notification which can
+                // be used to cancel the worker
+                .addAction(android.R.drawable.ic_delete, cancel, intent)
+                .build()
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                return ForegroundInfo(101, notification)
+            } else {
+                return ForegroundInfo(101, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            }
+        }
+
+        private fun createChannel(mvc: MVC) {
+            val name = mvc.getString(R.string.notification_channel_name)
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val mChannel = NotificationChannel("102", name, importance)
+            mChannel.description = mvc.getString(R.string.notification_channel_description)
+            // Register the channel with the system. You can't change the importance
+            // or other notification behaviors after this.
+            notificationManager.createNotificationChannel(mChannel)
         }
 
         protected abstract fun doWork(mvc: MVC): Result

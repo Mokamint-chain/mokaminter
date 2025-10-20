@@ -187,6 +187,6 @@ class Miner: Comparable<Miner>, Parcelable {
     }
 
     override fun toString(): String {
-        return "$uuid"
+        return "${miningSpecification.name} ($uuid)"
     }
 }

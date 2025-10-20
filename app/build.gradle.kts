@@ -73,6 +73,7 @@ dependencies {
     implementation(libs.io.mokamint.miner.local)
     implementation(libs.io.mokamint.plotter)
     implementation(libs.io.hotmoka.crypto)
+    implementation(libs.androidx.work.ktx)
     // forces newer version: remove when imported in mokamint
     implementation(libs.io.hotmoka.marshalling)
     implementation(libs.io.hotmoka.websockets.client)

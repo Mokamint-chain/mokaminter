@@ -27,9 +27,6 @@ import io.mokamint.android.mokaminter.model.MinerStatus.Companion.HAS_PLOT_READY
 import io.mokamint.android.mokaminter.model.MinerStatus.Companion.IS_ON_TAG
 import io.mokamint.miner.MiningSpecifications
 import io.mokamint.miner.api.MiningSpecification
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
@@ -56,8 +53,6 @@ class Miners(private val mvc: MVC) {
      */
     @GuardedBy("itself")
     private val miners = HashMap<Miner, MinerStatus>()
-
-    private val mainScope = CoroutineScope(Dispatchers.Main)
 
     companion object {
 
@@ -105,7 +100,7 @@ class Miners(private val mvc: MVC) {
         synchronized (miners) {
             miners.put(miner, status)
             writeIntoInternalStorage()
-            Log.i(TAG, "Added miner ${miner.miningSpecification.name}")
+            Log.i(TAG, "Added miner $miner")
         }
     }
 
@@ -120,7 +115,7 @@ class Miners(private val mvc: MVC) {
         synchronized (miners) {
             if (miners.remove(miner) != null) {
                 writeIntoInternalStorage()
-                Log.i(TAG, "Removed miner ${miner.miningSpecification.name}")
+                Log.i(TAG, "Removed miner $miner")
                 return true
             } else return false
         }
@@ -139,6 +134,7 @@ class Miners(private val mvc: MVC) {
 
             if (status != null && status.markPlotReady()) {
                 writeIntoInternalStorage()
+                Log.i(TAG, "Marked existence of plot for miner $miner")
                 return true
             }
 
@@ -159,7 +155,6 @@ class Miners(private val mvc: MVC) {
 
             if (status != null && status.turnOn()) {
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onTurnedOn(miner) }
                 Log.i(TAG, "Turned on miner $miner")
                 return true
             }
@@ -181,7 +176,6 @@ class Miners(private val mvc: MVC) {
 
             if (status != null && status.turnOff()) {
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onTurnedOff(miner) }
                 Log.i(TAG, "Turned off miner $miner")
                 return true
             }
@@ -203,7 +197,7 @@ class Miners(private val mvc: MVC) {
             var status = miners[miner]
             if (status != null && status.setBalance(balance)) {
                 writeIntoInternalStorage()
-                mainScope.launch { mvc.view?.onBalanceChanged(miner) }
+                // mainScope.launch { mvc.view?.onBalanceChanged(miner) } // TODO
                 Log.i(TAG, "Updated balance of miner $miner to $balance")
                 return true
             }
@@ -248,11 +242,8 @@ class Miners(private val mvc: MVC) {
 
         while (parser.next() != XmlPullParser.END_TAG)
             if (parser.eventType == XmlPullParser.START_TAG)
-                if (parser.name == MINER_TAG) {
+                if (parser.name == MINER_TAG)
                     readMinerAndStatus(parser)
-                    //val miner = Miner(parser)
-                    //miners.put(miner.uuid, miner)
-                }
                 else
                     skip(parser)
 

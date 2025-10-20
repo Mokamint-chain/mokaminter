@@ -150,8 +150,10 @@ class Controller(val mvc: MVC) {
     fun onTurnOnRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                if (mvc.model.miners.markAsOn(miner))
+                if (mvc.model.miners.markAsOn(miner)) {
                     startServiceFor(miner)
+                    mainScope.launch { mvc.view?.onTurnedOn(miner) }
+                }
             }
         }
     }
@@ -160,8 +162,10 @@ class Controller(val mvc: MVC) {
     fun onTurnOffRequested(miner: Miner) {
         safeRunAsIO {
             synchronized (minersLock) {
-                if (mvc.model.miners.markAsOff(miner))
+                if (mvc.model.miners.markAsOff(miner)) {
                     stopServiceFor(miner)
+                    mainScope.launch { mvc.view?.onTurnedOff(miner) }
+                }
             }
         }
     }

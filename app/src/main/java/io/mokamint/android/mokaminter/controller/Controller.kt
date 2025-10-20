@@ -192,7 +192,7 @@ class Controller(val mvc: MVC) {
             if (publicKeyBase58 != null) {
                 try {
                     miner = Miner(uuid, miningSpecification, uri, size, publicKeyBase58)
-                    Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
+                    Log.i(TAG, "Ready to create plot file for miner $miner")
                     mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
                 }
                 catch (_: InvalidKeySpecException) {
@@ -207,7 +207,7 @@ class Controller(val mvc: MVC) {
                 miner = Miner(uuid, miningSpecification, uri, size,
                     Base58.toBase58String(signatureForDeadlines.encodingOf
                         (entropy.keys(password, signatureForDeadlines).public)))
-                Log.i(TAG, "Ready to create plot file for miner ${miner.miningSpecification.name}")
+                Log.i(TAG, "Ready to create plot file for miner $miner")
                 mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
             }
             else {

@@ -9,6 +9,7 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import java.io.FileNotFoundException
 import java.math.BigInteger
+import java.util.UUID
 
 /**
  * The set of miners. They are constrained to have distinct name.
@@ -164,6 +165,22 @@ class Miners(private val mvc: MVC) {
             }
 
             return false
+        }
+    }
+
+    /**
+     * Yields the miner in this container, having the given identifier.
+     *
+     * @param uuid the identifier of the requested miner
+     * @return the miner, if it exists
+     */
+    fun get(uuid: UUID) : Miner? {
+        return try {
+            synchronized (miners) {
+                miners.keys.first { miner -> miner.uuid == uuid }
+            }
+        } catch (_: NoSuchElementException) {
+            null
         }
     }
 

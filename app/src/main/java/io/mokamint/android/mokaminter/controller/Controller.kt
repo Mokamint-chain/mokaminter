@@ -1,8 +1,15 @@
 package io.mokamint.android.mokaminter.controller
 
+import android.content.Context
 import android.util.Log
 import androidx.annotation.GuardedBy
 import androidx.annotation.UiThread
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkRequest
+import androidx.work.Worker
+import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.Base58ConversionException
 import io.hotmoka.crypto.api.Entropy
@@ -218,51 +225,106 @@ class Controller(val mvc: MVC) {
         return uuid
     }
 
-    @UiThread
-    fun onPlotCreationRequested(miner: Miner) {
-        safeRunAsIO {
-            val filename = "${miner.uuid}.plot"
-            val path = mvc.filesDir.toPath().resolve(filename)
-            mainScope.launch { mvc.view?.onPlotCreationStarted(miner) }
-            var status = MinerStatus(BigInteger.ZERO,
-                hasPlotReady = false,
-                isOn = true
-            )
+    abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): Worker(mvc, workerParams) {
 
-            synchronized (minersLock) {
-                mvc.model.miners.add(miner, status)
+        override fun doWork(): Result {
+            val mvc = applicationContext as MVC
+            val controller = mvc.controller
+            controller.working.incrementAndGet()
+            controller.mainScope.launch { mvc.view?.onBackgroundStart() }
+
+            try {
+                return doWork(mvc)
+            }
+            catch (_: TimeoutException) {
+                Log.w(TAG, "A background work timed-out")
+                controller.mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
+                return Result.failure()
+            } catch (t: Throwable) {
+                Log.w(TAG, "A background work failed", t)
+                controller.mainScope.launch { mvc.view?.notifyUser(t.toString()) }
+                return Result.failure()
+            }
+            finally {
+                if (controller.working.decrementAndGet() == 0)
+                    controller.mainScope.launch { mvc.view?.onBackgroundEnd() }
+            }
+        }
+
+        protected abstract fun doWork(mvc: MVC): Result
+    }
+
+    class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
+
+        override fun doWork(mvc: MVC): Result {
+            val controller = mvc.controller
+            val uuid = UUID.fromString(inputData.getString("uuid"))
+            val miner = mvc.model.miners.get(uuid)
+            if (miner == null) {
+                Log.w(
+                    TAG,
+                    "The miner with uuid $uuid has been deleted before the creation of its plot!"
+                )
+                return Result.success()
             }
 
-            mainScope.launch { mvc.view?.onAdded(miner) }
-
-            // we split the synchronization on minersLock in order to allow operating
-            // on the miners during the (potentially slow) creation of the plot
+            val filename = "$uuid.plot"
+            val path = mvc.filesDir.toPath().resolve(filename)
 
             Log.i(TAG, "Started creation of $path for miner $miner")
 
             try {
-                Plots.create(path, miner.getProlog(), 0, miner.size,
+                Plots.create(
+                    path, miner.getProlog(), 0, miner.size,
                     miner.miningSpecification.hashingForDeadlines
                 ) { percent ->
-                    mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
+                    controller.mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
                     Log.i(TAG, "Created $percent% of plot $path")
                 }
-            }
-            catch (_: FileNotFoundException) {
+            } catch (_: FileNotFoundException) {
                 // the miner has been deleted before the complete creation of its plot
-                Log.w(TAG, "Miner $miner has been deleted before the full creation of its plot!")
+                Log.w(
+                    TAG,
+                    "Miner $miner has been deleted before the full creation of its plot!"
+                )
+                return Result.success()
             }
 
             Log.i(TAG, "Completed creation of $path for miner $miner")
 
-            synchronized (minersLock) {
+            synchronized(controller.minersLock) {
                 if (mvc.model.miners.markHasPlot(miner)) {
-                    mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
-                    startServiceFor(miner)
-                }
-                else deletePlotOf(miner)
+                    controller.mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
+                    controller.startServiceFor(miner)
+                } else controller.deletePlotOf(miner)
             }
+
+            return Result.success()
         }
+    }
+
+    @UiThread
+    fun onPlotCreationRequested(miner: Miner) {
+        mvc.view?.onPlotCreationConfirmed(miner)
+
+        var status = MinerStatus(BigInteger.ZERO,
+            hasPlotReady = false,
+            isOn = true
+        )
+
+        synchronized (minersLock) {
+            mvc.model.miners.add(miner, status)
+        }
+
+        mvc.view?.onAdded(miner)
+
+        val plotCreationRequest: WorkRequest =
+            OneTimeWorkRequestBuilder<PlotCreationWorker>()
+                .setInputData(workDataOf(Pair("uuid", miner.uuid.toString())))
+                .build()
+
+        WorkManager.getInstance(mvc)
+            .enqueue(plotCreationRequest)
     }
 
     private fun safeRunAsIO(showProgressBar: Boolean = true, task: () -> Unit) {
@@ -274,16 +336,13 @@ class Controller(val mvc: MVC) {
         ioScope.launch {
             try {
                 task.invoke()
-            }
-            catch (_: TimeoutException) {
+            } catch (_: TimeoutException) {
                 Log.w(TAG, "The operation timed-out")
                 mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
-            }
-            catch (t: Throwable) {
+            } catch (t: Throwable) {
                 Log.w(TAG, "A background IO action failed", t)
                 mainScope.launch { mvc.view?.notifyUser(t.toString()) }
-            }
-            finally {
+            } finally {
                 if (showProgressBar && working.decrementAndGet() == 0)
                     mainScope.launch { mvc.view?.onBackgroundEnd() }
             }

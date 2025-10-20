@@ -190,7 +190,7 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             CreatePlotConfirmationDialogFragment.show(this, miner)
     }
 
-    override fun onPlotCreationStarted(miner: Miner) {
+    override fun onPlotCreationConfirmed(miner: Miner) {
         // we serve only the miner whose creation we started
         if (miner.uuid == uuid)
             popBackStack()

@@ -62,11 +62,11 @@ interface View {
     @UiThread fun onReadyToCreatePlotFor(miner: Miner) {}
 
     /**
-     * Called when the creation of the plot for the given miner starts.
+     * Called when the creation of the plot for the given miner has been confirmed by the user.
      *
      * @param miner the miner for which the plot is being created
      */
-    @UiThread fun onPlotCreationStarted(miner: Miner) {}
+    @UiThread fun onPlotCreationConfirmed(miner: Miner) {}
 
     /**
      * Called when the creation of the plot for the given miner has

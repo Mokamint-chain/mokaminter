@@ -17,7 +17,7 @@ class Mokaminter : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
 
     companion object {
-        private val TAG = Mokaminter::class.simpleName
+        private val TAG = Mokaminter::class.simpleName!!
         val NOTIFICATION_CHANNEL = TAG
     }
 

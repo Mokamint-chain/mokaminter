@@ -24,6 +24,7 @@ import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.MinerStatus
+import io.mokamint.android.mokaminter.view.Mokaminter
 import io.mokamint.miner.api.MiningSpecification
 import io.mokamint.miner.local.LocalMiners
 import io.mokamint.miner.service.AbstractReconnectingMinerService
@@ -262,41 +263,26 @@ class Controller(val mvc: MVC) {
         }
 
         private fun createForegroundInfo(progress: String, mvc: MVC): ForegroundInfo {
-            val id = "id"
-            val title = "title"
-            val cancel = "Stop"
             // This PendingIntent can be used to cancel the worker
             val intent = WorkManager.getInstance(mvc)
-                .createCancelPendingIntent(getId())
+                .createCancelPendingIntent(id)
 
-            createChannel(mvc)
-
-            val notification = NotificationCompat.Builder(mvc, id)
-                .setContentTitle(title)
-                .setTicker(title)
-                .setContentText(progress)
+            val notification = NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
+                .setContentTitle("Title")
+                .setTicker("Ticker")
+                .setContentText("progress")
                 .setSmallIcon(R.drawable.ic_active_miner)
                 .setOngoing(true)
                 // Add the cancel action to the notification which can
                 // be used to cancel the worker
-                .addAction(android.R.drawable.ic_delete, cancel, intent)
+                .addAction(android.R.drawable.ic_delete, "Cancel", intent)
                 .build()
 
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                return ForegroundInfo(101, notification)
+            return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                ForegroundInfo(101, notification)
             } else {
-                return ForegroundInfo(101, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                ForegroundInfo(101, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             }
-        }
-
-        private fun createChannel(mvc: MVC) {
-            val name = mvc.getString(R.string.notification_channel_name)
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
-            val mChannel = NotificationChannel("102", name, importance)
-            mChannel.description = mvc.getString(R.string.notification_channel_description)
-            // Register the channel with the system. You can't change the importance
-            // or other notification behaviors after this.
-            notificationManager.createNotificationChannel(mChannel)
         }
 
         protected abstract fun doWork(mvc: MVC): Result

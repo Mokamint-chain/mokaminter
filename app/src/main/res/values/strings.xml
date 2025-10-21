@@ -18,6 +18,7 @@
     <string name="dismiss">Dismiss</string>
     <string name="delete">Delete</string>
     <string name="create">Create</string>
+    <string name="stop">Stop</string>
     <string name="action_reload_miners">Reload</string>
     <string name="action_reload_miners_tooltip">Reloads the miners\' information.</string>
     <string name="action_add_miner">Add miner</string>
@@ -78,4 +79,6 @@
     <string name="menu_miners">Miners</string>
     <string name="action_turn_on_miner">Turn on</string>
     <string name="action_turn_off_miner">Turn off</string>
+    <string name="notification_plot_creation_title">Plot creation</string>
+    <string name="notification_plot_creation_description">The creation of the plot file for miner %1$s is in progress</string>
 </resources>

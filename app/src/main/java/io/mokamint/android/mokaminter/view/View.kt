@@ -112,4 +112,11 @@ interface View {
      * @param miner the miner that has been disconnected
      */
     @UiThread fun onDisconnected(miner: Miner) {}
+
+    /**
+     * Called when the given miner has computed a new deadline.
+     *
+     * @param miner the miner that has computed the deadline
+     */
+    @UiThread fun onDeadlineComputed(miner: Miner) {}
 }

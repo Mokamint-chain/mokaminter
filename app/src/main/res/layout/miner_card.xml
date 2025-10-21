@@ -20,6 +20,17 @@
         android:layout_height="wrap_content"
         android:padding="8dp">
 
+        <ImageView
+            android:id="@+id/image_heart"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/menu_button"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.0"/>
+
         <ImageButton
             android:id="@+id/menu_button"
             style="?android:attr/actionOverflowButtonStyle"
@@ -41,7 +52,7 @@
             android:textSize="20sp"
             android:textStyle="bold"
             app:layout_constraintBottom_toTopOf="@+id/description"
-            app:layout_constraintEnd_toStartOf="@+id/menu_button"
+            app:layout_constraintEnd_toStartOf="@+id/image_heart"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:ignore="TouchTargetSizeCheck" />
@@ -55,7 +66,7 @@
             android:textSize="12sp"
             android:textStyle="italic"
             app:layout_constraintBottom_toTopOf="@+id/uri"
-            app:layout_constraintEnd_toStartOf="@+id/menu_button"
+            app:layout_constraintEnd_toStartOf="@+id/image_heart"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/name"
             tools:ignore="TouchTargetSizeCheck" />

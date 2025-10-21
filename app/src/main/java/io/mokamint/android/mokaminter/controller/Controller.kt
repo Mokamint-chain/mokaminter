@@ -1,7 +1,5 @@
 package io.mokamint.android.mokaminter.controller
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.os.Build
@@ -14,7 +12,6 @@ import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
-import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.hotmoka.crypto.Base58
@@ -30,6 +27,7 @@ import io.mokamint.miner.local.LocalMiners
 import io.mokamint.miner.service.AbstractReconnectingMinerService
 import io.mokamint.miner.service.MinerServices
 import io.mokamint.miner.service.api.ReconnectingMinerService
+import io.mokamint.nonce.api.Deadline
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +112,11 @@ class Controller(val mvc: MVC) {
             override fun onDisconnected() {
                 super.onDisconnected()
                 mainScope.launch { mvc.view?.onDisconnected(miner) }
+            }
+
+            override fun onDeadlineComputed(deadline: Deadline?) {
+                super.onDeadlineComputed(deadline)
+                mainScope.launch { mvc.view?.onDeadlineComputed(miner) }
             }
         }
     }
@@ -235,11 +238,8 @@ class Controller(val mvc: MVC) {
 
     abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
-        private val notificationManager = mvc.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
         override suspend fun doWork(): Result {
             val mvc = applicationContext as MVC
-            setForeground(createForegroundInfo("pippo", mvc))
             val controller = mvc.controller
             controller.working.incrementAndGet()
             controller.mainScope.launch { mvc.view?.onBackgroundStart() }
@@ -262,35 +262,35 @@ class Controller(val mvc: MVC) {
             }
         }
 
-        private fun createForegroundInfo(progress: String, mvc: MVC): ForegroundInfo {
-            // This PendingIntent can be used to cancel the worker
-            val intent = WorkManager.getInstance(mvc)
+        protected suspend fun showNotification(title: String, description: String, isOngoing: Boolean) {
+            // this PendingIntent can be used to cancel the worker
+            val intent = WorkManager.getInstance(applicationContext)
                 .createCancelPendingIntent(id)
 
-            val notification = NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
-                .setContentTitle("Title")
-                .setTicker("Ticker")
-                .setContentText("progress")
+            val notification = NotificationCompat.Builder(applicationContext, Mokaminter.NOTIFICATION_CHANNEL)
+                .setContentTitle(title)
+                .setContentText(description)
                 .setSmallIcon(R.drawable.ic_active_miner)
-                .setOngoing(true)
-                // Add the cancel action to the notification which can
-                // be used to cancel the worker
-                .addAction(android.R.drawable.ic_delete, "Cancel", intent)
+                .setOngoing(isOngoing)
+                // Add the cancel action to the notification which can be used to cancel the worker
+                .addAction(R.drawable.ic_delete, applicationContext.getString(R.string.stop), intent)
                 .build()
 
-            return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 ForegroundInfo(101, notification)
             } else {
                 ForegroundInfo(101, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             }
+
+            setForeground(foregroundInfo)
         }
 
-        protected abstract fun doWork(mvc: MVC): Result
+        protected abstract suspend fun doWork(mvc: MVC): Result
     }
 
     class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
 
-        override fun doWork(mvc: MVC): Result {
+        override suspend fun doWork(mvc: MVC): Result {
             val controller = mvc.controller
             val uuid = UUID.fromString(inputData.getString("uuid"))
             val miner = mvc.model.miners.get(uuid)
@@ -301,6 +301,15 @@ class Controller(val mvc: MVC) {
                 )
                 return Result.success()
             }
+
+            showNotification(
+                mvc.getString(R.string.notification_plot_creation_title),
+                mvc.getString(
+                    R.string.notification_plot_creation_description,
+                    miner.miningSpecification.name
+                ),
+                true
+            )
 
             val filename = "$uuid.plot"
             val path = mvc.filesDir.toPath().resolve(filename)

@@ -2,8 +2,8 @@ package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
 import android.content.res.ColorStateList
+import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -11,6 +11,7 @@ import android.view.MenuItem
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.annotation.UiThread
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
@@ -28,6 +29,7 @@ import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
     private lateinit var adapter: RecyclerAdapter
+    private lateinit var viewsLayoutManager: LinearLayoutManager
 
     companion object {
         private val TAG = MinersFragment::class.simpleName
@@ -41,8 +43,10 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): android.view.View {
         setBinding(FragmentMinersBinding.inflate(inflater, container, false))
         adapter = RecyclerAdapter()
-        binding.recyclerView.layoutManager = LinearLayoutManager(context)
+        viewsLayoutManager = LinearLayoutManager(context)
+        binding.recyclerView.layoutManager = viewsLayoutManager
         binding.recyclerView.adapter = adapter
+
         return binding.root
     }
 
@@ -116,6 +120,10 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         adapter.update(miner)
     }
 
+    @UiThread override fun onDeadlineComputed(miner: Miner) {
+        adapter.showHeartFor(miner)
+    }
+
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
         private var snapshot = MinersSnapshot.empty()
 
@@ -146,6 +154,21 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             val pos = snapshot.indexOf(miner)
             if (pos >= 0)
                 notifyItemChanged(pos)
+        }
+
+        fun showHeartFor(miner: Miner) {
+            val pos = snapshot.indexOf(miner)
+            if (pos >= 0) {
+                // we identify the view of the card #pos and look for the image view
+                // whose background we can set to the heart animation
+                viewsLayoutManager.findViewByPosition(pos)
+                    ?.findViewById<ImageView>(R.id.image_heart)?.let { it ->
+                    // we must reset the drawable to 0, or otherwise the animation does not restart
+                    it.setBackgroundResource(0)
+                    it.setBackgroundResource(R.drawable.animation_heart)
+                    (it.background as AnimationDrawable).start()
+                }
+            }
         }
 
         fun progressPlotCreation(miner: Miner, percent: Int) {
@@ -215,7 +238,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             }
 
             private fun createMenuForMiner(miner: Miner, status: MinerStatus) {
-                Log.d(TAG, "$status")
                 val popup = PopupMenu(context, binding.menuButton)
                 popup.menuInflater.inflate(R.menu.miner_actions, popup.menu)
                 popup.menu[1].isEnabled = status.isOn

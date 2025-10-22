@@ -240,8 +240,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             private fun createMenuForMiner(miner: Miner, status: MinerStatus) {
                 val popup = PopupMenu(context, binding.menuButton)
                 popup.menuInflater.inflate(R.menu.miner_actions, popup.menu)
+                popup.menu[0].isEnabled = status.hasPlotReady && !status.isOn
                 popup.menu[1].isEnabled = status.isOn
-                popup.menu[2].isEnabled = status.hasPlotReady && !status.isOn
                 popup.setOnMenuItemClickListener{ item -> clickListenerForMiner(item, miner) }
                 popup.show()
             }

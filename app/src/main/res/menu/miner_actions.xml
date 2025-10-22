@@ -3,24 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_delete_miner"
+        android:id="@+id/action_turn_on_miner"
         android:orderInCategory="101"
-        android:icon="@drawable/ic_delete"
-        android:title="@string/action_delete_miner"
+        android:title="@string/action_turn_on_miner"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_turn_off_miner"
         android:orderInCategory="102"
-        android:icon="@drawable/ic_delete"
         android:title="@string/action_turn_off_miner"
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_turn_on_miner"
+        android:id="@+id/action_delete_miner"
         android:orderInCategory="103"
-        android:icon="@drawable/ic_delete"
-        android:title="@string/action_turn_on_miner"
+        android:title="@string/action_delete_miner"
         app:showAsAction="never" />
 
 </menu>

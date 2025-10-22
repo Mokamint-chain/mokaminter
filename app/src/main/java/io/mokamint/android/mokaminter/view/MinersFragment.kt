@@ -1,7 +1,6 @@
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
@@ -206,13 +205,13 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             fun bindTo(miner: Miner, status: MinerStatus) {
                 if (getController().hasConnectedServiceFor(miner)) {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
-                        ContextCompat.getColor(context, R.color.mokamint_bright)
+                        ContextCompat.getColor(context, R.color.light_gray)
                     )
                     binding.plotSize.text = getString(R.string.miner_card_plot_size, totalNonces(miner))
                 }
                 else {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
-                        ContextCompat.getColor(context, R.color.mokamint_medium)
+                        ContextCompat.getColor(context, R.color.gray)
                     )
 
                     if (status.hasPlotReady)

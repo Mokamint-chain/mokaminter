@@ -10,6 +10,7 @@ import org.xmlpull.v1.XmlPullParserException
 import java.io.FileNotFoundException
 import java.math.BigInteger
 import java.util.UUID
+import java.util.function.BiConsumer
 
 /**
  * The set of miners. They are constrained to have distinct name.
@@ -77,7 +78,6 @@ class Miners(private val mvc: MVC) {
         synchronized (miners) {
             if (miners.remove(miner) != null) {
                 writeIntoInternalStorage()
-                Log.i(TAG, "Removed miner $miner")
                 return true
             } else return false
         }
@@ -159,7 +159,6 @@ class Miners(private val mvc: MVC) {
             var status = miners[miner]
             if (status != null && status.setBalance(balance)) {
                 writeIntoInternalStorage()
-                // mainScope.launch { mvc.view?.onBalanceChanged(miner) } // TODO
                 Log.i(TAG, "Updated balance of miner $miner to $balance")
                 return true
             }
@@ -210,6 +209,10 @@ class Miners(private val mvc: MVC) {
 
                 override fun indexOf(miner: Miner): Int {
                     return sortedMiners.indexOf(miner)
+                }
+
+                override fun forEach(action: BiConsumer<Miner, MinerStatus>) {
+                    sortedMiners.forEach { miner ->  action.accept(miner, copy[miner]!!) }
                 }
             }
         }

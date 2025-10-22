@@ -1,6 +1,7 @@
 package io.mokamint.android.mokaminter.model
 
 import java.lang.IndexOutOfBoundsException
+import java.util.function.BiConsumer
 
 /**
  * A snapshot of the set of miners with their associated status.
@@ -24,6 +25,9 @@ interface MinersSnapshot {
 
                 override fun indexOf(miner: Miner): Int {
                     return -1
+                }
+
+                override fun forEach(action: BiConsumer<Miner, MinerStatus>) {
                 }
             }
         }
@@ -54,4 +58,11 @@ interface MinersSnapshot {
      *         belong to this snapshot
      */
     fun indexOf(miner: Miner): Int
+
+    /**
+     * Performs the given action for each miner in this container.
+     *
+     * @param action the action to perform
+     */
+    fun forEach(action: BiConsumer<Miner, MinerStatus>)
 }

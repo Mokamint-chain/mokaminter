@@ -17,11 +17,14 @@ import androidx.work.workDataOf
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.Base58ConversionException
 import io.hotmoka.crypto.api.Entropy
+import io.hotmoka.websockets.api.FailedDeploymentException
 import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.MinerStatus
+import io.mokamint.android.mokaminter.model.MinersSnapshot
 import io.mokamint.android.mokaminter.view.Mokaminter
+import io.mokamint.miner.api.ClosedMinerException
 import io.mokamint.miner.api.MiningSpecification
 import io.mokamint.miner.local.LocalMiners
 import io.mokamint.miner.service.AbstractReconnectingMinerService
@@ -78,14 +81,9 @@ class Controller(val mvc: MVC) {
         services.computeIfAbsent(miner) { m -> createService(m) };
     }
 
-    @GuardedBy("this.minersLock")
-    private fun stopServiceFor(miner: Miner) {
-        services.remove(miner)?.close()
-    }
-
     @UiThread
     fun hasConnectedServiceFor(miner: Miner): Boolean {
-        return services.get(miner)?.isConnected == true
+        return services[miner]?.isConnected == true
     }
 
     @GuardedBy("this.minersLock")
@@ -107,6 +105,7 @@ class Controller(val mvc: MVC) {
             override fun onConnected() {
                 super.onConnected()
                 mainScope.launch { mvc.view?.onConnected(miner) }
+                fetchBalanceOf(miner)
             }
 
             override fun onDisconnected() {
@@ -127,14 +126,15 @@ class Controller(val mvc: MVC) {
     }
 
     @UiThread
-    fun onReloadRequested() {
+    fun onMinersReloadRequested() {
         safeRunAsIO {
+            var snapshot: MinersSnapshot
+
             synchronized (minersLock) {
-                val snapshot = mvc.model.miners.reload()
-                for (pos in 0..<snapshot.size()) {
-                    val status = snapshot.getStatus(pos)
+                snapshot = mvc.model.miners.reload()
+                snapshot.forEach { miner, status ->
                     if (status.isOn && status.hasPlotReady)
-                        startServiceFor(snapshot.getMiner(pos))
+                        startServiceFor(miner)
                 }
             }
 
@@ -144,19 +144,61 @@ class Controller(val mvc: MVC) {
     }
 
     @UiThread
-    fun onDeleteRequested(miner: Miner) {
+    fun onBalancesReloadRequested() {
         safeRunAsIO {
-            var done = false
-
-            synchronized (minersLock) {
-                done = mvc.model.miners.remove(miner)
-                if (done)
-                    stopServiceFor(miner)
+            mvc.model.miners.snapshot().forEach { miner, status ->
+                if (status.isOn && status.hasPlotReady)
+                    fetchBalanceOf(miner)
             }
 
-            if (done) {
-                deletePlotOf(miner)
+            Log.i(TAG, "Fetched the balances of all miners")
+        }
+    }
+
+    private fun fetchBalanceOf(miner: Miner) {
+        if (hasConnectedServiceFor(miner)) {
+            try {
+                val balance = services[miner]?.getBalance(
+                    miner.miningSpecification.signatureForDeadlines,
+                    miner.publicKey
+                )
+
+                Log.d(TAG, "Fetched balance $balance of $miner")
+
+                if (balance != null && balance.isPresent) {
+                    var done = false
+
+                    synchronized(minersLock) {
+                        done = mvc.model.miners.setBalance(miner, balance.get())
+                    }
+
+                    if (done)
+                        mainScope.launch { mvc.view?.onBalanceChanged(miner) }
+                }
+            }
+            catch (e: ClosedMinerException) {
+                Log.w(TAG, "Failed while reading the balance of $miner: ${e.message}")
+            }
+            catch (e: TimeoutException) {
+                Log.w(TAG, "Failed while reading the balance of $miner: ${e.message}")
+            }
+        }
+    }
+
+    @UiThread
+    fun onDeleteRequested(miner: Miner) {
+        safeRunAsIO(false) {
+            var service: ReconnectingMinerService? = null
+
+            synchronized (minersLock) {
+                if (mvc.model.miners.remove(miner))
+                    service = services.remove(miner)
+            }
+
+            if (service != null) {
                 mainScope.launch { mvc.view?.onDeleted(miner) }
+                service.close()
+                deletePlotOf(miner)
             }
         }
     }
@@ -187,17 +229,18 @@ class Controller(val mvc: MVC) {
 
     @UiThread
     fun onTurnOffRequested(miner: Miner) {
-        safeRunAsIO {
-            var done = false
+        safeRunAsIO(false) {
+            var service: ReconnectingMinerService? = null
 
             synchronized (minersLock) {
-                done = mvc.model.miners.markAsOff(miner)
-                if (done)
-                    stopServiceFor(miner)
+                if (mvc.model.miners.markAsOff(miner))
+                    service = services.remove(miner)
             }
 
-            if (done)
+            if (service != null) {
                 mainScope.launch { mvc.view?.onTurnedOff(miner) }
+                service.close()
+            }
         }
     }
 
@@ -211,38 +254,42 @@ class Controller(val mvc: MVC) {
         val uuid = UUID.randomUUID()
 
         safeRunAsIO {
-            val miningSpecification: MiningSpecification
+            try {
+                val miningSpecification: MiningSpecification
 
-            MinerServices.of(uri, 20_000).use {
-                miningSpecification = it.miningSpecification
-            }
+                MinerServices.of(uri, 20_000).use {
+                    miningSpecification = it.miningSpecification
+                }
 
-            Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
+                Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
 
-            val miner: Miner
-            if (publicKeyBase58 != null) {
-                try {
-                    miner = Miner(uuid, miningSpecification, uri, size, publicKeyBase58)
+                val miner: Miner
+                if (publicKeyBase58 != null) {
+                    try {
+                        miner = Miner(uuid, miningSpecification, uri, size, publicKeyBase58)
+                        Log.i(TAG, "Ready to create plot file for miner $miner")
+                        mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
+                    } catch (_: InvalidKeySpecException) {
+                        mainScope.launch { mvc.view?.notifyUser(mvc.applicationContext.getString(R.string.add_miner_message_invalid_public_key)) }
+                    } catch (_: Base58ConversionException) {
+                        mainScope.launch { mvc.view?.notifyUser(mvc.applicationContext.getString(R.string.add_miner_message_public_key_not_base58)) }
+                    }
+                } else if (entropy != null && password != null) {
+                    val signatureForDeadlines = miningSpecification.signatureForDeadlines
+                    miner = Miner(
+                        uuid, miningSpecification, uri, size,
+                        Base58.toBase58String(
+                            signatureForDeadlines.encodingOf
+                                (entropy.keys(password, signatureForDeadlines).public)
+                        )
+                    )
                     Log.i(TAG, "Ready to create plot file for miner $miner")
                     mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
+                } else {
+                    throw IllegalStateException("Nor a public key nor a mnemonic have been provided")
                 }
-                catch (_: InvalidKeySpecException) {
-                    mainScope.launch { mvc.view?.notifyUser(mvc.applicationContext.getString(R.string.add_miner_message_invalid_public_key)) }
-                }
-                catch (_: Base58ConversionException) {
-                    mainScope.launch { mvc.view?.notifyUser(mvc.applicationContext.getString(R.string.add_miner_message_public_key_not_base58)) }
-                }
-            }
-            else if (entropy != null && password != null) {
-                val signatureForDeadlines = miningSpecification.signatureForDeadlines
-                miner = Miner(uuid, miningSpecification, uri, size,
-                    Base58.toBase58String(signatureForDeadlines.encodingOf
-                        (entropy.keys(password, signatureForDeadlines).public)))
-                Log.i(TAG, "Ready to create plot file for miner $miner")
-                mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
-            }
-            else {
-                throw IllegalStateException("Nor a public key nor a mnemonic have been provided")
+            } catch (_: FailedDeploymentException) {
+                mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.cannot_contact, uri)) }
             }
         }
 
@@ -395,10 +442,10 @@ class Controller(val mvc: MVC) {
     }
 
     private fun safeRunAsIO(showProgressBar: Boolean = true, task: () -> Unit) {
-        if (showProgressBar)
+        if (showProgressBar) {
             working.incrementAndGet()
-
-        mainScope.launch { mvc.view?.onBackgroundStart() }
+            mainScope.launch { mvc.view?.onBackgroundStart() }
+        }
 
         ioScope.launch {
             try {

@@ -51,7 +51,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     override fun onResume() {
-        getController().onResumeRequested()
+        getController().onReloadRequested()
         super.onResume()
     }
 

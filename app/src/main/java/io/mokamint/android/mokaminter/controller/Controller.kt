@@ -127,7 +127,7 @@ class Controller(val mvc: MVC) {
     }
 
     @UiThread
-    fun onResumeRequested() {
+    fun onReloadRequested() {
         safeRunAsIO {
             synchronized (minersLock) {
                 val snapshot = mvc.model.miners.reload()
@@ -136,22 +136,27 @@ class Controller(val mvc: MVC) {
                     if (status.isOn && status.hasPlotReady)
                         startServiceFor(snapshot.getMiner(pos))
                 }
-
-                Log.i(TAG, "Reloaded the list of miners")
-                mainScope.launch { mvc.view?.onMinersReloaded() }
             }
+
+            Log.i(TAG, "Reloaded the list of miners")
+            mainScope.launch { mvc.view?.onMinersReloaded() }
         }
     }
 
     @UiThread
     fun onDeleteRequested(miner: Miner) {
         safeRunAsIO {
+            var done = false
+
             synchronized (minersLock) {
-                if (mvc.model.miners.remove(miner)) {
+                done = mvc.model.miners.remove(miner)
+                if (done)
                     stopServiceFor(miner)
-                    deletePlotOf(miner)
-                    mainScope.launch { mvc.view?.onDeleted(miner) }
-                }
+            }
+
+            if (done) {
+                deletePlotOf(miner)
+                mainScope.launch { mvc.view?.onDeleted(miner) }
             }
         }
     }
@@ -167,24 +172,32 @@ class Controller(val mvc: MVC) {
     @UiThread
     fun onTurnOnRequested(miner: Miner) {
         safeRunAsIO {
+            var done = false
+
             synchronized (minersLock) {
-                if (mvc.model.miners.markAsOn(miner)) {
+                done = mvc.model.miners.markAsOn(miner)
+                if (done)
                     startServiceFor(miner)
-                    mainScope.launch { mvc.view?.onTurnedOn(miner) }
-                }
             }
+
+            if (done)
+                mainScope.launch { mvc.view?.onTurnedOn(miner) }
         }
     }
 
     @UiThread
     fun onTurnOffRequested(miner: Miner) {
         safeRunAsIO {
+            var done = false
+
             synchronized (minersLock) {
-                if (mvc.model.miners.markAsOff(miner)) {
+                done = mvc.model.miners.markAsOff(miner)
+                if (done)
                     stopServiceFor(miner)
-                    mainScope.launch { mvc.view?.onTurnedOff(miner) }
-                }
             }
+
+            if (done)
+                mainScope.launch { mvc.view?.onTurnedOff(miner) }
         }
     }
 
@@ -238,11 +251,18 @@ class Controller(val mvc: MVC) {
 
     abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
+        companion object {
+            const val REQUIRES_PROGRESS_BAR = "requiresProgressbar"
+        }
+
         override suspend fun doWork(): Result {
             val mvc = applicationContext as MVC
             val controller = mvc.controller
-            controller.working.incrementAndGet()
-            controller.mainScope.launch { mvc.view?.onBackgroundStart() }
+            val requiresProgressBar = inputData.getBoolean(REQUIRES_PROGRESS_BAR, true)
+            if (requiresProgressBar) {
+                controller.working.incrementAndGet()
+                controller.mainScope.launch { mvc.view?.onBackgroundStart() }
+            }
 
             try {
                 return doWork(mvc)
@@ -257,7 +277,7 @@ class Controller(val mvc: MVC) {
                 return Result.failure()
             }
             finally {
-                if (controller.working.decrementAndGet() == 0)
+                if (requiresProgressBar && controller.working.decrementAndGet() == 0)
                     controller.mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
         }
@@ -290,9 +310,13 @@ class Controller(val mvc: MVC) {
 
     class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
 
+        companion object {
+            const val MINER_UUID = "miner_uuid"
+        }
+
         override suspend fun doWork(mvc: MVC): Result {
             val controller = mvc.controller
-            val uuid = UUID.fromString(inputData.getString("uuid"))
+            val uuid = UUID.fromString(inputData.getString(MINER_UUID))
             val miner = mvc.model.miners.get(uuid)
             if (miner == null) {
                 Log.w(
@@ -363,7 +387,7 @@ class Controller(val mvc: MVC) {
 
         val plotCreationRequest: WorkRequest =
             OneTimeWorkRequestBuilder<PlotCreationWorker>()
-                .setInputData(workDataOf(Pair("uuid", miner.uuid.toString())))
+                .setInputData(workDataOf(Pair(PlotCreationWorker.MINER_UUID, miner.uuid.toString())))
                 .build()
 
         WorkManager.getInstance(mvc)

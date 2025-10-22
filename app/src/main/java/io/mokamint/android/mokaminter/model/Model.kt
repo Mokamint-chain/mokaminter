@@ -12,5 +12,5 @@ class Model(mvc: MVC) {
     /**
      * The miners of the user.
      */
-    val miners: Miners = Miners(mvc)
+    val miners = Miners(mvc)
 }

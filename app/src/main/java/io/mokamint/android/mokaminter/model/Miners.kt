@@ -152,12 +152,13 @@ class Miners(private val mvc: MVC) {
      * @param miner the miner; if it does not belong to this set of miners,
      *              this method does nothing
      * @param balance the new balance to set for {@code miner}
-     * @return true if and only if the miner belongs to this set and has its balance has been changed
+     * @return true if and only if the miner belongs to this set
      */
     fun setBalance(miner: Miner, balance: BigInteger): Boolean {
         synchronized (miners) {
             var status = miners[miner]
-            if (status != null && status.setBalance(balance)) {
+            if (status != null) {
+                status.setBalance(balance)
                 writeIntoInternalStorage()
                 Log.i(TAG, "Updated balance of miner $miner to $balance")
                 return true

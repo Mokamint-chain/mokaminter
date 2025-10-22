@@ -4,4 +4,12 @@
         <item quantity="one">one nonce</item>
         <item quantity="other">%s nonces</item>
     </plurals>
+    <plurals name="minutes_ago">
+        <item quantity="one">one minute ago</item>
+        <item quantity="other">%d minutes ago</item>
+    </plurals>
+    <plurals name="seconds_ago">
+        <item quantity="one">one second ago</item>
+        <item quantity="other">%d seconds ago</item>
+    </plurals>
 </resources>

@@ -19,7 +19,7 @@
     <string name="delete">Delete</string>
     <string name="create">Create</string>
     <string name="stop">Stop</string>
-    <string name="action_reload_miners">Reload</string>
+    <string name="action_reload_balances">Reload balances</string>
     <string name="action_reload_miners_tooltip">Reloads the miners\' information.</string>
     <string name="action_add_miner">Add miner</string>
     <string name="action_add_miner_tooltip">Adds a new miner for a mining endpoint.</string>
@@ -59,6 +59,7 @@
     <string name="add_miner_message_public_key_not_base58">The inserted public key is not in Base58 format</string>
     <string name="add_miner_bip39_word">%1$d: %2$s</string>
     <string name="miner_card_balance">balance: %1$s</string>
+    <string name="miner_card_last_updated">last updated: %1$s</string>
     <string name="notification_mining_activity">Mining activity</string>
     <string name="notification_miner_is_active">The Mokamint miner is active</string>
     <string name="notification_pause_mining">Pause mining</string>
@@ -82,4 +83,8 @@
     <string name="notification_plot_creation_title">Plot creation</string>
     <string name="notification_plot_creation_description">The creation of the plot file for miner %1$s is in progress</string>
     <string name="cannot_contact">Cannot contact %1$s</string>
+    <string name="never">never</string>
+    <string name="in_the_future">in the future</string>
+    <string name="now">now</string>
+    <string name="more_than_one_hour_ago">more than one hour ago</string>
 </resources>

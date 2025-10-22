@@ -1,10 +1,10 @@
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -26,6 +26,7 @@ import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.MinerStatus
 import io.mokamint.android.mokaminter.model.MinersSnapshot
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
+import java.time.Instant
 
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     private lateinit var adapter: RecyclerAdapter
@@ -38,6 +39,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setHasOptionsMenu(true)
+        getController().onMinersUpdaterRequested()
     }
 
     override fun onResume() {
@@ -64,7 +66,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     @Deprecated("Deprecated in Java")
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.action_reload -> {
+            R.id.action_reload_balances -> {
                 getController().onBalancesReloadRequested()
                 true
             }
@@ -77,6 +79,10 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     @UiThread override fun onMinersReloaded() {
+        adapter.update()
+    }
+
+    @UiThread override fun onRedrawMiners() {
         adapter.update()
     }
 
@@ -229,12 +235,44 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                 binding.description.text = miner.miningSpecification.description
                 binding.uri.text = getString(R.string.miner_card_uri, miner.uri)
                 binding.balance.text = getString(R.string.miner_card_balance, status.balance)
+                binding.lastUpdated.text = getString(R.string.miner_card_last_updated,
+                    lastUpdatedMessage(status))
                 binding.publicKey.text = getString(
                     R.string.miner_card_public_key,
                     miner.publicKeyBase58,
                     miner.miningSpecification.signatureForDeadlines.name + ", base58"
                 )
                 binding.menuButton.setOnClickListener { createMenuForMiner(miner, status) }
+            }
+
+            /**
+             * Yields a man readable representation of the last updated information in the
+             * given miner status information, in the form, for instance, of seconds or minutes ago.
+             *
+             * @return the man readable representation of the last updated information
+             */
+            fun lastUpdatedMessage(status: MinerStatus): String {
+                val lastUpdated = status.lastUpdated
+
+                if (lastUpdated < 0)
+                    return context.getString(R.string.never)
+
+                val now = Instant.now().toEpochMilli()
+                val diff = now - lastUpdated
+                if (diff < 0)
+                    return getString(R.string.in_the_future)
+                else if (diff < 1_000L)
+                    return getString(R.string.now)
+                else if (diff < 60_000L) {
+                    val seconds = diff.toInt() / 1_000
+                    return resources.getQuantityString(R.plurals.seconds_ago, seconds, seconds)
+                }
+                else if (diff < 3_600_000L) {
+                    val minutes = diff.toInt() / 60_000
+                    return resources.getQuantityString(R.plurals.minutes_ago, minutes, minutes)
+                }
+                else
+                    return getString(R.string.more_than_one_hour_ago)
             }
 
             private fun createMenuForMiner(miner: Miner, status: MinerStatus) {

@@ -8,7 +8,9 @@ import androidx.annotation.GuardedBy
 import androidx.annotation.UiThread
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
@@ -34,6 +36,7 @@ import io.mokamint.nonce.api.Deadline
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import java.math.BigInteger
@@ -44,14 +47,15 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * The controller of the MVC triple.
  *
  * @param mvc the MVC triple
  */
-class Controller(val mvc: MVC) {
-
+class Controller {
+    private val mvc : MVC
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)
@@ -66,14 +70,34 @@ class Controller(val mvc: MVC) {
      */
     private val services = ConcurrentHashMap<Miner, ReconnectingMinerService>()
 
+    constructor(mvc: MVC) {
+        this.mvc = mvc
+    }
+
     companion object {
         private val TAG = Controller::class.simpleName
 
         /**
          * The interval, in milliseconds, between successive
-         * background fetches of the balances of the miners.
+         * updates of the last updated information of the miners.
          */
-        private const val BALANCE_FETCH_INTERVAL = 60 * 60 * 1000L // every hour
+        private const val MINERS_REDRAW_INTERVAL = 10_000L // ten seconds
+
+        /**
+         * The number of deadlines that must be computed before triggering a new
+         * fetch of the balance of a miner.
+         */
+        private const val DEADLINES_FOR_BALANCE_FETCH = 10 // TODO: increase to 100 at least
+    }
+
+    fun onMinersUpdaterRequested() {
+        val minersUpdateRequest: OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<MinersRedrawWorker>()
+                .setInputData(workDataOf(Pair(ControllerWorker.REQUIRES_PROGRESS_BAR, false)))
+                .build()
+
+        WorkManager.getInstance(mvc)
+            .enqueueUniqueWork("update", ExistingWorkPolicy.REPLACE, minersUpdateRequest)
     }
 
     @GuardedBy("this.minersLock")
@@ -102,10 +126,18 @@ class Controller(val mvc: MVC) {
         return object :
             AbstractReconnectingMinerService(Optional.of(localMiner), miner.uri, 30000, 30000) {
 
+            /**
+             * A counter of the deadlines computed with this service, used
+             * to decide when to reload the balance of the corresponding miner.
+             */
+            private var deadlines: Int = 0
+
             override fun onConnected() {
                 super.onConnected()
                 mainScope.launch { mvc.view?.onConnected(miner) }
-                fetchBalanceOf(miner)
+                safeRunAsIO(false) {
+                    fetchBalanceOf(miner)
+                }
             }
 
             override fun onDisconnected() {
@@ -116,6 +148,11 @@ class Controller(val mvc: MVC) {
             override fun onDeadlineComputed(deadline: Deadline?) {
                 super.onDeadlineComputed(deadline)
                 mainScope.launch { mvc.view?.onDeadlineComputed(miner) }
+                if (++deadlines % DEADLINES_FOR_BALANCE_FETCH == 0) {
+                    safeRunAsIO(false) {
+                        fetchBalanceOf(miner)
+                    }
+                }
             }
         }
     }
@@ -165,11 +202,11 @@ class Controller(val mvc: MVC) {
 
                 Log.d(TAG, "Fetched balance $balance of $miner")
 
-                if (balance != null && balance.isPresent) {
+                if (balance != null) {
                     var done = false
 
                     synchronized(minersLock) {
-                        done = mvc.model.miners.setBalance(miner, balance.get())
+                        done = mvc.model.miners.setBalance(miner, balance.orElse(BigInteger.ZERO))
                     }
 
                     if (done)
@@ -318,6 +355,8 @@ class Controller(val mvc: MVC) {
                 Log.w(TAG, "A background work timed-out")
                 controller.mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
                 return Result.failure()
+            } catch (_: CancellationException) {
+                return Result.success()
             } catch (t: Throwable) {
                 Log.w(TAG, "A background work failed", t)
                 controller.mainScope.launch { mvc.view?.notifyUser(t.toString()) }
@@ -353,6 +392,21 @@ class Controller(val mvc: MVC) {
         }
 
         protected abstract suspend fun doWork(mvc: MVC): Result
+    }
+
+    /**
+     * This background work redraws the current view periodically,
+     * in order, for instance, to keep the last update field updated in real time.
+     * Note that this work has only graphical relevance and is consequently not
+     * a foreground worker, that would survive also when the activity gets destroyed.
+     */
+    class MinersRedrawWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
+        override suspend fun doWork(mvc: MVC): Result {
+            while (true) {
+                delay(MINERS_REDRAW_INTERVAL)
+                mvc.controller.mainScope.launch { mvc.view?.onRedrawMiners() }
+            }
+        }
     }
 
     class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
@@ -423,7 +477,8 @@ class Controller(val mvc: MVC) {
 
         var status = MinerStatus(BigInteger.ZERO,
             hasPlotReady = false,
-            isOn = true
+            isOn = true,
+            -1L
         )
 
         synchronized (minersLock) {

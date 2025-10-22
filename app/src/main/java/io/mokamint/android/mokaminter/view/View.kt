@@ -119,4 +119,9 @@ interface View {
      * @param miner the miner that has computed the deadline
      */
     @UiThread fun onDeadlineComputed(miner: Miner) {}
+
+    /**
+     * Called when the last updated field of the miners must be redrawn.
+     */
+    @UiThread fun onRedrawMiners() {}
 }

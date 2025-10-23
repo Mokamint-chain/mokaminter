@@ -57,7 +57,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * @param mvc the MVC triple
  */
-class Controller(val mvc: MVC) {
+class Controller(private val mvc: MVC) {
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val working = AtomicInteger(0)

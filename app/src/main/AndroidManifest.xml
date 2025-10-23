@@ -35,6 +35,9 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+        <receiver android:name=".controller.StopMiningReceiver" android:exported="false">
+        </receiver>
+
     </application>
 
 </manifest>

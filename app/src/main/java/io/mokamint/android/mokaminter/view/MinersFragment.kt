@@ -205,13 +205,13 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             fun bindTo(miner: Miner, status: MinerStatus) {
                 if (getController().hasConnectedServiceFor(miner)) {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
-                        ContextCompat.getColor(context, R.color.light_gray)
+                        ContextCompat.getColor(context, R.color.connected_miner)
                     )
                     binding.plotSize.text = getString(R.string.miner_card_plot_size, totalNonces(miner))
                 }
                 else {
                     binding.card.backgroundTintList = ColorStateList.valueOf(
-                        ContextCompat.getColor(context, R.color.gray)
+                        ContextCompat.getColor(context, R.color.disconnected_miner)
                     )
 
                     if (status.hasPlotReady)

@@ -148,9 +148,6 @@ class Controller(private val mvc: MVC) {
             override fun onConnected() {
                 super.onConnected()
                 mainScope.launch { mvc.view?.onConnected(miner) }
-                safeRunAsIO(false) {
-                    fetchBalanceOf(miner)
-                }
             }
 
             override fun onDisconnected() {
@@ -161,7 +158,7 @@ class Controller(private val mvc: MVC) {
             override fun onDeadlineComputed(deadline: Deadline?) {
                 super.onDeadlineComputed(deadline)
                 mainScope.launch { mvc.view?.onDeadlineComputed(miner) }
-                if (++deadlines % DEADLINES_FOR_BALANCE_FETCH == 0) {
+                if (deadlines++ % DEADLINES_FOR_BALANCE_FETCH == 0) {
                     safeRunAsIO(false) {
                         fetchBalanceOf(miner)
                     }
@@ -391,7 +388,7 @@ class Controller(private val mvc: MVC) {
                 .setPriority(NotificationManager.IMPORTANCE_MIN)
 
             stopIntent?.let { it ->
-                builder.addAction(R.drawable.ic_delete, applicationContext.getString(R.string.stop), it)
+                builder.addAction(R.drawable.ic_delete, applicationContext.getString(R.string.turnOff), it)
             }
 
             val notification = builder.build()

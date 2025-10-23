@@ -18,7 +18,7 @@
     <string name="dismiss">Dismiss</string>
     <string name="delete">Delete</string>
     <string name="create">Create</string>
-    <string name="stop">Stop</string>
+    <string name="turnOff">Turn off</string>
     <string name="action_reload_balances">Reload balances</string>
     <string name="action_reload_miners_tooltip">Reloads the miners\' information.</string>
     <string name="action_add_miner">Add miner</string>

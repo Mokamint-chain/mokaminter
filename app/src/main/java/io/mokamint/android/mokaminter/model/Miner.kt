@@ -19,6 +19,7 @@ import java.net.URISyntaxException
 import java.security.NoSuchAlgorithmException
 import java.security.PublicKey
 import java.security.spec.InvalidKeySpecException
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -56,6 +57,12 @@ class Miner: Comparable<Miner>, Parcelable {
      */
     val publicKeyBase58: String
 
+    /**
+     * The moment of creation of this miner. This is used to oder miners with
+     * the same name wrt their creation time.
+     */
+    val creationTimeUTC: Long
+
     companion object {
         private const val UUID_TAG = "uuid"
         private const val MINING_SPECIFICATION_TAG = "mining-specification"
@@ -69,6 +76,8 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val SIGNATURE_FOR_BLOCKS_TAG = "signature-for-blocks"
         private const val PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58_TAG = "public-key-for-signing-blocks-base58"
         private const val PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG = "public-key-for-signing-deadlines-base58"
+
+        private const val CREATION_TIME_UTC_TAG = "creation-time-utc"
 
         @Suppress("unused") @JvmField
         val CREATOR = object : Parcelable.Creator<Miner?> {
@@ -100,6 +109,7 @@ class Miner: Comparable<Miner>, Parcelable {
         this.size = size
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(Base58.fromBase58String(publicKeyBase58))
         this.publicKeyBase58 = publicKeyBase58
+        this.creationTimeUTC = Instant.now().toEpochMilli() // UTC time
 
         if (size < 1)
             throw IllegalArgumentException("The plot size must be a strictly positive number")
@@ -133,6 +143,7 @@ class Miner: Comparable<Miner>, Parcelable {
         parcel.readByteArray(publicKeyForSigningDeadlinesBytes)
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(publicKeyForSigningDeadlinesBytes)
         this.publicKeyBase58 = Base58.toBase58String(publicKeyForSigningDeadlinesBytes)
+        this.creationTimeUTC = parcel.readLong()
     }
 
     constructor(parser: XmlPullParser) {
@@ -142,6 +153,7 @@ class Miner: Comparable<Miner>, Parcelable {
         var uri: URI? = null
         var size: Long? = null
         var publicKeyBase58: String? = null
+        var creationTimeUTC: Long? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG)
@@ -153,16 +165,17 @@ class Miner: Comparable<Miner>, Parcelable {
                 URI_TAG -> uri = readURI(parser)
                 SIZE_TAG -> size = readSize(parser)
                 PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG -> publicKeyBase58 = readText(parser)
+                CREATION_TIME_UTC_TAG -> creationTimeUTC = readLong(parser)
                 else -> skip(parser)
             }
         }
 
         parser.require(XmlPullParser.END_TAG, null, tag)
 
-        this.uuid = uuid ?: throw XmlPullParserException("Missing UUID in miner")
-        this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing mining specification in miner")
-        this.uri = uri ?: throw XmlPullParserException("Missing URI in miner")
-        this.size = size ?: throw XmlPullParserException("The plot size must be provided and be positive")
+        this.uuid = uuid ?: throw XmlPullParserException("Missing $UUID_TAG in miner")
+        this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing $MINING_SPECIFICATION_TAG in miner")
+        this.uri = uri ?: throw XmlPullParserException("Missing $URI_TAG in miner")
+        this.size = size ?: throw XmlPullParserException("The $SIZE_TAG size must be provided and be positive")
         this.publicKeyBase58 = Base58.requireBase58(publicKeyBase58, ::XmlPullParserException)
         try {
             this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(
@@ -172,6 +185,7 @@ class Miner: Comparable<Miner>, Parcelable {
         catch (e: InvalidKeySpecException) {
             throw XmlPullParserException(e.message)
         }
+        this.creationTimeUTC = creationTimeUTC ?: throw XmlPullParserException("Missing $CREATION_TIME_UTC_TAG in miner")
     }
 
     fun writeWith(serializer: XmlSerializer, tag: String) {
@@ -216,6 +230,10 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.text(publicKeyBase58)
         serializer.endTag(null, PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG)
 
+        serializer.startTag(null, CREATION_TIME_UTC_TAG)
+        serializer.text(creationTimeUTC.toString())
+        serializer.endTag(null, CREATION_TIME_UTC_TAG)
+
         serializer.endTag(null, tag)
     }
 
@@ -251,14 +269,21 @@ class Miner: Comparable<Miner>, Parcelable {
         val publicKeyBytes = miningSpecification.signatureForDeadlines.encodingOf(publicKey)
         out.writeInt(publicKeyBytes.size)
         out.writeByteArray(publicKeyBytes)
+        out.writeLong(creationTimeUTC)
     }
 
     override fun compareTo(other: Miner): Int {
-        val diff = miningSpecification.name.compareTo(other.miningSpecification.name)
+        var diff = miningSpecification.name.compareTo(other.miningSpecification.name)
         return if (diff != 0)
             diff
-        else
-            uuid.compareTo(other.uuid)
+        else {
+            diff = creationTimeUTC.compareTo(other.creationTimeUTC)
+
+            if (diff != 0)
+                diff;
+            else
+                uuid.compareTo(other.uuid)
+        }
     }
 
     override fun equals(other: Any?): Boolean {
@@ -386,6 +411,17 @@ class Miner: Comparable<Miner>, Parcelable {
         }
         catch (e: NoSuchAlgorithmException) {
             throw XmlPullParserException(e.message)
+        }
+    }
+
+    private fun readLong(parser: XmlPullParser): Long {
+        val value = readText(parser)
+
+        try {
+            return value.toLong()
+        }
+        catch (e: NumberFormatException) {
+            throw XmlPullParserException("Illegal lastUpdated: ${e.message}")
         }
     }
 

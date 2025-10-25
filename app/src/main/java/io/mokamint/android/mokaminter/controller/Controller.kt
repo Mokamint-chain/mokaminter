@@ -1,18 +1,29 @@
 package io.mokamint.android.mokaminter.controller
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.job.JobInfo
+import android.app.job.JobParameters
+import android.app.job.JobScheduler
+import android.app.job.JobService
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+import android.net.NetworkRequest
 import android.os.Build
+import android.os.Bundle
+import android.os.PersistableBundle
 import android.util.Log
 import androidx.annotation.GuardedBy
+import androidx.annotation.RequiresApi
 import androidx.annotation.UiThread
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
+import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -87,7 +98,7 @@ class Controller(private val mvc: MVC) {
          */
         private const val DEADLINES_FOR_BALANCE_FETCH = 100
 
-        private val nextNotificationId = AtomicInteger(100)
+        private val nextId = AtomicInteger(100)
     }
 
     fun onMinersUpdaterRequested() {
@@ -105,16 +116,45 @@ class Controller(private val mvc: MVC) {
         val old = services[miner]
         val new = services.computeIfAbsent(miner) { m -> createService(m) }
         if (old != new) {
-            val serviceWatcherRequest: OneTimeWorkRequest =
-                OneTimeWorkRequestBuilder<ServiceWatcherWorker>()
-                    .setInputData(workDataOf(
-                        Pair(ControllerWorker.REQUIRES_PROGRESS_BAR, false),
-                        Pair(ServiceWatcherWorker.MINER_UUID, miner.uuid.toString())
-                    ))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                Log.i(TAG, "using WorkManager")
+                val serviceWatcherRequest: OneTimeWorkRequest =
+                    OneTimeWorkRequestBuilder<ServiceWatcherWorker>()
+                        .setInputData(
+                            workDataOf(
+                                Pair(ControllerWorker.REQUIRES_PROGRESS_BAR, false),
+                                Pair(ServiceWatcherWorker.MINER_UUID, miner.uuid.toString())
+                            )
+                        )
+                        .build()
+
+                WorkManager.getInstance(mvc)
+                    .enqueueUniqueWork(
+                        miner.uuid.toString(),
+                        ExistingWorkPolicy.REPLACE,
+                        serviceWatcherRequest
+                    )
+            }
+            else {
+                Log.i(TAG, "using JobScheduler")
+                val networkRequest = NetworkRequest.Builder().build()
+
+                val args = PersistableBundle()
+                args.putString(ServiceWatcherJobService.MINER_UUID, miner.uuid.toString())
+
+                val jobInfo = JobInfo.Builder(miner.uuid.hashCode(),
+                    ComponentName(mvc, ServiceWatcherJobService::class.java))
+                    .setUserInitiated(true)
+                    .setRequiredNetwork(networkRequest)
+                    .setEstimatedNetworkBytes(1024L * 1024 * 1024, 1024L * 1024 * 1024)
+                    .setExtras(args)
                     .build()
 
-            WorkManager.getInstance(mvc)
-                .enqueueUniqueWork(miner.uuid.toString(), ExistingWorkPolicy.REPLACE, serviceWatcherRequest)
+                val jobScheduler: JobScheduler =
+                    mvc.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+
+                jobScheduler.schedule(jobInfo)
+            }
         }
     }
 
@@ -291,6 +331,41 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    private fun createNotification(title: String, description: String, stopIntent: PendingIntent?, isOngoing: Boolean): Notification {
+        val builder = NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
+            .setContentTitle(title)
+            .setContentText(description)
+            .setSmallIcon(R.drawable.ic_active_miner)
+            .setOngoing(isOngoing)
+            .setAutoCancel(false)
+            .setPriority(NotificationManager.IMPORTANCE_MIN)
+
+        stopIntent?.let { it ->
+            builder.addAction(R.drawable.ic_delete, mvc.getString(R.string.turnOff), it)
+        }
+
+        return builder.build()
+    }
+
+    private fun createActiveMiningNotification(miner: Miner): Notification {
+        val stopIntent = Intent(mvc, StopMiningReceiver::class.java)
+        stopIntent.putExtra(StopMiningReceiver.UUID, miner.uuid.toString())
+        val stopMiningIntent = PendingIntent.getBroadcast(
+            mvc, nextId.getAndIncrement(), stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return createNotification(
+            mvc.getString(R.string.notification_miner_is_active),
+            mvc.getString(
+                R.string.notification_miner_is_active_description,
+                miner.miningSpecification.name
+            ),
+            stopMiningIntent,
+            true
+        )
+    }
+
     /**
      * Requests the creation of a miner.
      *
@@ -378,25 +453,11 @@ class Controller(private val mvc: MVC) {
             }
         }
 
-        protected suspend fun setForegroundWithNotification(title: String, description: String, notificationId: Int, stopIntent: PendingIntent?, isOngoing: Boolean) {
-            val builder = NotificationCompat.Builder(applicationContext, Mokaminter.NOTIFICATION_CHANNEL)
-                .setContentTitle(title)
-                .setContentText(description)
-                .setSmallIcon(R.drawable.ic_active_miner)
-                .setOngoing(isOngoing)
-                .setAutoCancel(false)
-                .setPriority(NotificationManager.IMPORTANCE_MIN)
-
-            stopIntent?.let { it ->
-                builder.addAction(R.drawable.ic_delete, applicationContext.getString(R.string.turnOff), it)
-            }
-
-            val notification = builder.build()
-
+        protected suspend fun publishForegroundNotification(notification: Notification) {
             val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                ForegroundInfo(notificationId, notification)
+                ForegroundInfo(nextId.getAndIncrement(), notification)
             } else {
-                ForegroundInfo(notificationId, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                ForegroundInfo(nextId.getAndIncrement(), notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             }
 
             setForeground(foregroundInfo)
@@ -420,48 +481,79 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    class ServiceWatcherJobService: JobService() {
+        private val scope = CoroutineScope(Dispatchers.IO)
+
+        companion object {
+            const val MINER_UUID = "miner_uuid"
+        }
+
+        @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+        override fun onStartJob(params: JobParameters): Boolean {
+            val mvc = applicationContext as MVC
+            val controller = mvc.controller
+
+            val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
+            val miner = mvc.model.miners.get(uuid)
+            if (miner == null) {
+                Log.w(TAG, "The miner with uuid $uuid cannot be found!")
+                jobFinished(params, false)
+                return false
+            }
+
+            val service = controller.services.get(miner)
+            if (service == null) {
+                Log.w(TAG, "The service of the miner with uuid $uuid cannot be found!")
+                jobFinished(params, false)
+                return false
+            }
+
+            val notification = controller.createActiveMiningNotification(miner)
+
+            setNotification(
+                params, nextId.getAndIncrement(), notification,
+                JobService.JOB_END_NOTIFICATION_POLICY_REMOVE
+            )
+
+            scope.launch {
+                Log.d(TAG, "Started waiting job for $uuid")
+                service.waitUntilClosed()
+                jobFinished(params, false)
+            }
+
+            return true
+        }
+
+        override fun onStopJob(params: JobParameters): Boolean {
+            val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
+            Log.d(TAG, "System stopped job for miner $uuid")
+            return false
+        }
+    }
+
     class ServiceWatcherWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
         companion object {
             const val MINER_UUID = "miner_uuid"
         }
 
         override suspend fun doWork(mvc: MVC): Result {
+            val controller = mvc.controller
             val uuid = UUID.fromString(inputData.getString(MINER_UUID))
             val miner = mvc.model.miners.get(uuid)
             if (miner == null) {
-                Log.e(
-                    TAG,
-                    "The miner with uuid $uuid cannot be found!"
-                )
+                Log.w(TAG, "The miner with uuid $uuid cannot be found!")
                 return Result.failure()
             }
 
-            val service = mvc.controller.services.get(miner)
+            val service = controller.services.get(miner)
             if (service == null) {
-                Log.e(
-                    TAG,
-                    "The service of the miner with uuid $uuid cannot be found!"
-                )
+                Log.w(TAG, "The service of the miner with uuid $uuid cannot be found!")
                 return Result.failure()
             }
 
-            val nextId = nextNotificationId.getAndIncrement()
-            val stopIntent = Intent(mvc, StopMiningReceiver::class.java)
-            stopIntent.putExtra(StopMiningReceiver.UUID, uuid.toString())
-            val stopMiningIntent = PendingIntent.getBroadcast(mvc, nextId, stopIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
-            setForegroundWithNotification(
-                mvc.getString(R.string.notification_miner_is_active),
-                mvc.getString(
-                    R.string.notification_miner_is_active_description,
-                    miner.miningSpecification.name
-                ),
-                nextId,
-                stopMiningIntent,
-                true
-            )
-
+            val notification = controller.createActiveMiningNotification(miner)
+            publishForegroundNotification(notification)
+            Log.d(TAG, "Started waiting work for $uuid")
             service.waitUntilClosed()
 
             return Result.success()
@@ -486,16 +578,17 @@ class Controller(private val mvc: MVC) {
                 return Result.success()
             }
 
-            setForegroundWithNotification(
+            val notification = controller.createNotification(
                 mvc.getString(R.string.notification_plot_creation_title),
                 mvc.getString(
                     R.string.notification_plot_creation_description,
                     miner.miningSpecification.name
                 ),
-                nextNotificationId.getAndIncrement(),
                 null,
                 false
             )
+
+            publishForegroundNotification(notification)
 
             val filename = "$uuid.plot"
             val path = mvc.filesDir.toPath().resolve(filename)

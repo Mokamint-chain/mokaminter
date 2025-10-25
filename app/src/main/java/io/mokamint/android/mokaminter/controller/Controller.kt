@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.net.NetworkRequest
+import android.net.NetworkSpecifier
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
@@ -59,6 +60,7 @@ import java.security.spec.InvalidKeySpecException
 import java.util.Optional
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
@@ -137,7 +139,8 @@ class Controller(private val mvc: MVC) {
             }
             else {
                 Log.i(TAG, "using JobScheduler")
-                val networkRequest = NetworkRequest.Builder().build()
+                val networkRequest = NetworkRequest.Builder()
+                    .build()
 
                 val args = PersistableBundle()
                 args.putString(ServiceWatcherJobService.MINER_UUID, miner.uuid.toString())
@@ -488,6 +491,8 @@ class Controller(private val mvc: MVC) {
             const val MINER_UUID = "miner_uuid"
         }
 
+        private var latch = CountDownLatch(1)
+
         @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
         override fun onStartJob(params: JobParameters): Boolean {
             val mvc = applicationContext as MVC
@@ -511,14 +516,18 @@ class Controller(private val mvc: MVC) {
             val notification = controller.createActiveMiningNotification(miner)
 
             setNotification(
-                params, nextId.getAndIncrement(), notification,
-                JobService.JOB_END_NOTIFICATION_POLICY_REMOVE
+                params, nextId.getAndIncrement(), notification, JOB_END_NOTIFICATION_POLICY_REMOVE
             )
 
             scope.launch {
-                Log.d(TAG, "Started waiting job for $uuid")
-                service.waitUntilClosed()
+                latch.await()
                 jobFinished(params, false)
+            }
+
+            scope.launch {
+                Log.d(TAG, "Started job for $uuid")
+                service.waitUntilClosed()
+                latch.countDown()
             }
 
             return true
@@ -527,7 +536,9 @@ class Controller(private val mvc: MVC) {
         override fun onStopJob(params: JobParameters): Boolean {
             val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
             Log.d(TAG, "System stopped job for miner $uuid")
-            return false
+            latch.countDown()
+            latch = CountDownLatch(1)
+            return true
         }
     }
 

@@ -489,12 +489,14 @@ class Controller(private val mvc: MVC) {
         }
 
         protected suspend fun publishForegroundNotification(notification: Notification) {
+            val id = nextId.getAndIncrement()
+
             val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
-                ForegroundInfo(nextId.getAndIncrement(), notification)
+                ForegroundInfo(id, notification)
             else
                 // more recent Android versions require a finer-grained specification
                 // of the foreground service
-                ForegroundInfo(nextId.getAndIncrement(), notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                ForegroundInfo(id, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
 
             setForeground(foregroundInfo)
         }
@@ -525,9 +527,10 @@ class Controller(private val mvc: MVC) {
 
         companion object {
             const val MINER_UUID = "miner_uuid"
+            var counter: Int = 0
         }
 
-        private var latch = CountDownLatch(1)
+        private var latches = ConcurrentHashMap<UUID, CountDownLatch>()
 
         @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
         override fun onStartJob(params: JobParameters): Boolean {
@@ -555,6 +558,9 @@ class Controller(private val mvc: MVC) {
                 params, nextId.getAndIncrement(), notification, JOB_END_NOTIFICATION_POLICY_REMOVE
             )
 
+            val latch = CountDownLatch(1)
+            latches.put(uuid, latch)
+
             // this coroutine waits for the closure of the service and then finishes the job
             controller.ioScope.launch {
                 latch.await()
@@ -573,8 +579,8 @@ class Controller(private val mvc: MVC) {
         override fun onStopJob(params: JobParameters): Boolean {
             val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
             Log.d(TAG, "System stopped job for miner $uuid")
-            latch.countDown() // we release the waiting coroutine, the job will re rescheduled
-            latch = CountDownLatch(1)
+            val latch = latches.remove(uuid)
+            latch?.countDown() // we release the waiting coroutine, the job will re rescheduled
             return true
         }
 

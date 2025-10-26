@@ -38,11 +38,9 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
-import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
-import androidx.work.WorkRequest
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.hotmoka.crypto.Base58
@@ -53,7 +51,6 @@ import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.MinerStatus
-import io.mokamint.android.mokaminter.model.MinersSnapshot
 import io.mokamint.android.mokaminter.view.Mokaminter
 import io.mokamint.miner.api.ClosedMinerException
 import io.mokamint.miner.api.MiningSpecification
@@ -87,6 +84,11 @@ import kotlin.coroutines.cancellation.CancellationException
 class Controller(private val mvc: MVC) {
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
+
+    /**
+     * True if and only if the controller is executing a background task for which the
+     * progress bar activity has been requested.
+     */
     private val working = AtomicInteger(0)
 
     /**
@@ -112,7 +114,7 @@ class Controller(private val mvc: MVC) {
          * The number of deadlines that must be computed before triggering a new
          * fetch of the balance of a miner.
          */
-        private const val DEADLINES_FOR_BALANCE_FETCH = 100
+        private const val DEADLINES_FOR_BALANCE_FETCH = 200
 
         private val nextId = AtomicInteger(100)
     }
@@ -122,9 +124,9 @@ class Controller(private val mvc: MVC) {
      */
     @UiThread
     fun onMinersUpdaterRequested() {
-        val minersUpdateRequest: OneTimeWorkRequest =
+        val minersUpdateRequest =
             OneTimeWorkRequestBuilder<MinersRedrawWorker>()
-                .setInputData(workDataOf(Pair(ControllerWorker.REQUIRES_PROGRESS_BAR, false)))
+                .setInputData(workDataOf(Pair(ControllerWorker.VISIBLE_TO_USER, false)))
                 .build()
 
         WorkManager.getInstance(mvc)
@@ -135,15 +137,23 @@ class Controller(private val mvc: MVC) {
     private fun startServiceFor(miner: Miner) {
         val old = services[miner]
         val new = services.computeIfAbsent(miner) { m -> createService(m) }
+
+        // if a service has been created for the miner, then we protect it with
+        // a foreground work that forces the app to stay alive and not get
+        // stopped/garbage-collected by the system
         if (old != new) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                Log.i(TAG, "using WorkManager")
-                val serviceWatcherRequest: OneTimeWorkRequest =
-                    OneTimeWorkRequestBuilder<ServiceWatcherWorker>()
+                // older Android versions will use the WorkManager, while newer
+                // versions have a quota limit on the WorkManager and therefore will rather
+                // use the JobScheduler; which, however, is not available in previous versions,
+                // so that both possibilities must be taken into account...
+                Log.i(TAG, "using the WorkManager")
+                val serviceWatcherRequest =
+                    OneTimeWorkRequestBuilder<MiningWatcherWorker>()
                         .setInputData(
                             workDataOf(
-                                Pair(ControllerWorker.REQUIRES_PROGRESS_BAR, false),
-                                Pair(ServiceWatcherWorker.MINER_UUID, miner.uuid.toString())
+                                Pair(ControllerWorker.VISIBLE_TO_USER, false),
+                                Pair(MiningWatcherWorker.MINER_UUID, miner.uuid.toString())
                             )
                         )
                         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -157,17 +167,17 @@ class Controller(private val mvc: MVC) {
                     )
             }
             else {
-                Log.i(TAG, "using JobScheduler")
+                // newer Android versions
+                Log.i(TAG, "using the JobScheduler")
                 val networkRequest = NetworkRequest.Builder()
                     .build()
 
                 val args = PersistableBundle()
-                args.putString(ServiceWatcherJobService.MINER_UUID, miner.uuid.toString())
+                args.putString(MiningWatcherJobService.MINER_UUID, miner.uuid.toString())
 
                 val jobInfo = JobInfo.Builder(miner.uuid.hashCode(),
-                    ComponentName(mvc, ServiceWatcherJobService::class.java))
+                    ComponentName(mvc, MiningWatcherJobService::class.java))
                     .setUserInitiated(true)
-                    //.setExpedited(true)
                     .setPriority(JobInfo.PRIORITY_MAX)
                     .setRequiredNetwork(networkRequest)
                     .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
@@ -224,9 +234,7 @@ class Controller(private val mvc: MVC) {
                 super.onDeadlineComputed(deadline)
                 mainScope.launch { mvc.view?.onDeadlineComputed(miner) }
                 if (deadlines++ % DEADLINES_FOR_BALANCE_FETCH == 0) {
-                    safeRunAsIO(false) {
-                        fetchBalanceOf(miner)
-                    }
+                    safeRunAsIO(false) { fetchBalanceOf(miner) }
                 }
             }
         }
@@ -440,17 +448,20 @@ class Controller(private val mvc: MVC) {
         return uuid
     }
 
+    /**
+     * Shared implementation of WorkManager works for this controller.
+     */
     abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
         companion object {
-            const val REQUIRES_PROGRESS_BAR = "requiresProgressbar"
+            const val VISIBLE_TO_USER = "visibleToTheUser"
         }
 
         override suspend fun doWork(): Result {
             val mvc = applicationContext as MVC
             val controller = mvc.controller
-            val requiresProgressBar = inputData.getBoolean(REQUIRES_PROGRESS_BAR, true)
-            if (requiresProgressBar) {
+            val visibleToUser = inputData.getBoolean(VISIBLE_TO_USER, true)
+            if (visibleToUser) {
                 controller.working.incrementAndGet()
                 controller.mainScope.launch { mvc.view?.onBackgroundStart() }
             }
@@ -460,27 +471,30 @@ class Controller(private val mvc: MVC) {
             }
             catch (_: TimeoutException) {
                 Log.w(TAG, "A background work timed-out")
-                controller.mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
+                if (visibleToUser)
+                    controller.mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
                 return Result.failure()
             } catch (_: CancellationException) {
                 return Result.success()
             } catch (t: Throwable) {
                 Log.w(TAG, "A background work failed", t)
-                controller.mainScope.launch { mvc.view?.notifyUser(t.toString()) }
+                if (visibleToUser)
+                    controller.mainScope.launch { mvc.view?.notifyUser(t.toString()) }
                 return Result.failure()
             }
             finally {
-                if (requiresProgressBar && controller.working.decrementAndGet() == 0)
+                if (visibleToUser && controller.working.decrementAndGet() == 0)
                     controller.mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
         }
 
         protected suspend fun publishForegroundNotification(notification: Notification) {
-            val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
                 ForegroundInfo(nextId.getAndIncrement(), notification)
-            } else {
+            else
+                // more recent Android versions require a finer-grained specification
+                // of the foreground service
                 ForegroundInfo(nextId.getAndIncrement(), notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-            }
 
             setForeground(foregroundInfo)
         }
@@ -503,8 +517,11 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    class ServiceWatcherJobService: JobService() {
-        private val scope = CoroutineScope(Dispatchers.IO)
+    /**
+     * A background job that waits for the closure of a mining service, so that the
+     * application remains in foreground until the last miner is turned off.
+     */
+    class MiningWatcherJobService: JobService() {
 
         companion object {
             const val MINER_UUID = "miner_uuid"
@@ -538,15 +555,16 @@ class Controller(private val mvc: MVC) {
                 params, nextId.getAndIncrement(), notification, JOB_END_NOTIFICATION_POLICY_REMOVE
             )
 
-            scope.launch {
+            // this coroutine waits for the closure of the service and then finishes the job
+            controller.ioScope.launch {
                 latch.await()
                 jobFinished(params, false)
             }
 
-            scope.launch {
-                Log.d(TAG, "Started job for $uuid")
+            controller.ioScope.launch {
+                Log.d(TAG, "Started mining watcher job for $uuid")
                 service.waitUntilClosed()
-                latch.countDown()
+                latch.countDown() // the service has been closed
             }
 
             return true
@@ -555,7 +573,7 @@ class Controller(private val mvc: MVC) {
         override fun onStopJob(params: JobParameters): Boolean {
             val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
             Log.d(TAG, "System stopped job for miner $uuid")
-            latch.countDown()
+            latch.countDown() // we release the waiting coroutine, the job will re rescheduled
             latch = CountDownLatch(1)
             return true
         }
@@ -565,7 +583,11 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    class ServiceWatcherWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
+    /**
+     * A background work that waits for the closure of a mining service, so that the
+     * application remains in foreground until the last miner is turned off.
+     */
+    class MiningWatcherWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
         companion object {
             const val MINER_UUID = "miner_uuid"
         }
@@ -587,13 +609,16 @@ class Controller(private val mvc: MVC) {
 
             val notification = controller.createActiveMiningNotification(miner)
             publishForegroundNotification(notification)
-            Log.d(TAG, "Started waiting work for $uuid")
+            Log.d(TAG, "Started mining watcher work for $uuid")
             service.waitUntilClosed()
 
             return Result.success()
         }
     }
 
+    /**
+     * A background work for the creation of the plot of a miner.
+     */
     class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
 
         companion object {
@@ -609,7 +634,7 @@ class Controller(private val mvc: MVC) {
                     TAG,
                     "The miner with uuid $uuid has been deleted before the creation of its plot!"
                 )
-                return Result.success()
+                return Result.failure()
             }
 
             val notification = controller.createNotification(
@@ -643,16 +668,17 @@ class Controller(private val mvc: MVC) {
                     TAG,
                     "Miner $miner has been deleted before the full creation of its plot!"
                 )
-                return Result.success()
+                return Result.failure()
             }
 
             Log.i(TAG, "Completed creation of $path for miner $miner")
 
-            synchronized(controller.minersLock) {
+            synchronized (controller.minersLock) {
                 if (mvc.model.miners.markHasPlot(miner)) {
                     controller.mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
                     controller.startServiceFor(miner)
-                } else controller.deletePlotOf(miner)
+                }
+                else controller.deletePlotOf(miner)
             }
 
             return Result.success()
@@ -663,7 +689,7 @@ class Controller(private val mvc: MVC) {
     fun onPlotCreationRequested(miner: Miner) {
         mvc.view?.onPlotCreationConfirmed(miner)
 
-        var status = MinerStatus(BigInteger.ZERO,
+        val status = MinerStatus(BigInteger.ZERO,
             hasPlotReady = false,
             isOn = true,
             -1L
@@ -675,7 +701,7 @@ class Controller(private val mvc: MVC) {
 
         mvc.view?.onAdded(miner)
 
-        val plotCreationRequest: WorkRequest =
+        val plotCreationRequest =
             OneTimeWorkRequestBuilder<PlotCreationWorker>()
                 .setInputData(workDataOf(Pair(PlotCreationWorker.MINER_UUID, miner.uuid.toString())))
                 .build()
@@ -695,10 +721,12 @@ class Controller(private val mvc: MVC) {
                 task.invoke()
             } catch (_: TimeoutException) {
                 Log.w(TAG, "The operation timed-out")
-                mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
+                if (showProgressBar)
+                    mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
             } catch (t: Throwable) {
                 Log.w(TAG, "A background IO action failed", t)
-                mainScope.launch { mvc.view?.notifyUser(t.toString()) }
+                if (showProgressBar)
+                    mainScope.launch { mvc.view?.notifyUser(t.toString()) }
             } finally {
                 if (showProgressBar && working.decrementAndGet() == 0)
                     mainScope.launch { mvc.view?.onBackgroundEnd() }

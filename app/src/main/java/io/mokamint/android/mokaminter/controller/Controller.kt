@@ -1,3 +1,19 @@
+/*
+Copyright 2025 Fausto Spoto
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package io.mokamint.android.mokaminter.controller
 
 import android.app.Notification
@@ -12,9 +28,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.net.NetworkRequest
-import android.net.NetworkSpecifier
 import android.os.Build
-import android.os.Bundle
 import android.os.PersistableBundle
 import android.util.Log
 import androidx.annotation.GuardedBy
@@ -24,9 +38,9 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
-import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
 import androidx.work.WorkerParameters
@@ -103,6 +117,10 @@ class Controller(private val mvc: MVC) {
         private val nextId = AtomicInteger(100)
     }
 
+    /**
+     * Called when the updater thread of the miners must be scheduled.
+     */
+    @UiThread
     fun onMinersUpdaterRequested() {
         val minersUpdateRequest: OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<MinersRedrawWorker>()
@@ -128,6 +146,7 @@ class Controller(private val mvc: MVC) {
                                 Pair(ServiceWatcherWorker.MINER_UUID, miner.uuid.toString())
                             )
                         )
+                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                         .build()
 
                 WorkManager.getInstance(mvc)
@@ -148,15 +167,18 @@ class Controller(private val mvc: MVC) {
                 val jobInfo = JobInfo.Builder(miner.uuid.hashCode(),
                     ComponentName(mvc, ServiceWatcherJobService::class.java))
                     .setUserInitiated(true)
+                    //.setExpedited(true)
+                    .setPriority(JobInfo.PRIORITY_MAX)
                     .setRequiredNetwork(networkRequest)
+                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                     .setEstimatedNetworkBytes(1024L * 1024 * 1024, 1024L * 1024 * 1024)
                     .setExtras(args)
                     .build()
 
-                val jobScheduler: JobScheduler =
-                    mvc.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-
-                jobScheduler.schedule(jobInfo)
+                val jobScheduler = mvc.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+                val result = jobScheduler.schedule(jobInfo)
+                if (result != JobScheduler.RESULT_SUCCESS)
+                    Log.w(TAG, "Could not schedule job: $result")
             }
         }
     }
@@ -248,14 +270,14 @@ class Controller(private val mvc: MVC) {
     private fun fetchBalanceOf(miner: Miner) {
         if (hasConnectedServiceFor(miner)) {
             try {
+                Log.d(TAG, "Asking balance of $miner")
                 val balance = services[miner]?.getBalance(
                     miner.miningSpecification.signatureForDeadlines,
                     miner.publicKey
                 )
 
-                Log.d(TAG, "Fetched balance $balance of $miner")
-
                 if (balance != null) {
+                    Log.d(TAG, "Fetched balance $balance of $miner")
                     var done = false
 
                     synchronized(minersLock) {
@@ -267,10 +289,10 @@ class Controller(private val mvc: MVC) {
                 }
             }
             catch (e: ClosedMinerException) {
-                Log.w(TAG, "Failed while reading the balance of $miner: ${e.message}")
+                Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
             }
             catch (e: TimeoutException) {
-                Log.w(TAG, "Failed while reading the balance of $miner: ${e.message}")
+                Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
             }
         }
     }
@@ -341,7 +363,7 @@ class Controller(private val mvc: MVC) {
             .setSmallIcon(R.drawable.ic_active_miner)
             .setOngoing(isOngoing)
             .setAutoCancel(false)
-            .setPriority(NotificationManager.IMPORTANCE_MIN)
+            .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
 
         stopIntent?.let { it ->
             builder.addAction(R.drawable.ic_delete, mvc.getString(R.string.turnOff), it)
@@ -539,6 +561,10 @@ class Controller(private val mvc: MVC) {
             latch.countDown()
             latch = CountDownLatch(1)
             return true
+        }
+
+        override fun onNetworkChanged(params: JobParameters) {
+            // nothing, just avoid the log line in the super implementation
         }
     }
 

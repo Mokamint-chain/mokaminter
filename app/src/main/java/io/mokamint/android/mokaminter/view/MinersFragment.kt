@@ -1,3 +1,19 @@
+/*
+Copyright 2025 Fausto Spoto
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
@@ -27,6 +43,9 @@ import io.mokamint.android.mokaminter.model.MinersSnapshot
 import io.mokamint.android.mokaminter.view.MinersFragmentDirections.toAddMiner
 import java.time.Instant
 
+/**
+ * The fragment that shows the list of the existing miners to the user.
+ */
 class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     private lateinit var adapter: RecyclerAdapter
     private lateinit var viewsLayoutManager: LinearLayoutManager
@@ -248,6 +267,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
              * Yields a man readable representation of the last updated information in the
              * given miner status information, in the form, for instance, of seconds or minutes ago.
              *
+             * @param status the miner status information
              * @return the man readable representation of the last updated information
              */
             fun lastUpdatedMessage(status: MinerStatus): String {

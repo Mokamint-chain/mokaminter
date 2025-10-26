@@ -1,3 +1,19 @@
+/*
+Copyright 2025 Fausto Spoto
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package io.mokamint.android.mokaminter.view
 
 import android.app.Activity
@@ -13,6 +29,9 @@ import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.controller.Controller
 import io.mokamint.android.mokaminter.model.Model
 
+/**
+ * Shared implementation of the fragments of this application.
+ */
 abstract class AbstractFragment<V: ViewBinding> : Fragment(), View {
     private var _binding: V? = null
     private var progressBar: ProgressBar? = null
@@ -27,11 +46,13 @@ abstract class AbstractFragment<V: ViewBinding> : Fragment(), View {
 
     @UiThread override fun onStart() {
         super.onStart()
+        // we are the view
         context.applicationContext.view = this
         setSubtitle("")
     }
 
     @UiThread override fun onStop() {
+        // there is no view anymore
         context.applicationContext.view = null
         closeKeyboard()
         super.onStop()

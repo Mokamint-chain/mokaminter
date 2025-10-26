@@ -1,3 +1,19 @@
+/*
+Copyright 2025 Fausto Spoto
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package io.mokamint.android.mokaminter.view
 
 import android.os.Bundle
@@ -19,6 +35,9 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.util.UUID
 
+/**
+ * A fragment that allows the user to enter the information needed to add a new miner.
+ */
 class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
 
     /**
@@ -63,6 +82,7 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
             addMiner()
         }
 
+        // the layout is configured differently on the basis of the checked buttons
         binding.createKey.setOnCheckedChangeListener { button, isChecked ->
             if (isChecked) configureForCreateKey() }
 
@@ -72,6 +92,7 @@ class AddMinerFragment: AbstractFragment<FragmentAddMinerBinding>() {
         binding.useExistingKeyPair.setOnCheckedChangeListener { button, isChecked ->
             if (isChecked) configureForUseExistingKeyPair() }
 
+        // we must configure the layout for the first appearance
         if (binding.createKey.isChecked)
             configureForCreateKey()
         else if (binding.useExistingKey.isChecked)

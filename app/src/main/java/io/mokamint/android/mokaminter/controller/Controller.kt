@@ -240,11 +240,8 @@ class Controller(private val mvc: MVC) {
     @UiThread
     fun onMinersReloadRequested() {
         safeRunAsIO {
-            var snapshot: MinersSnapshot
-
             synchronized (minersLock) {
-                snapshot = mvc.model.miners.reload()
-                snapshot.forEach { miner, status ->
+                mvc.model.miners.reload().forEach { miner, status ->
                     if (status.isOn && status.hasPlotReady)
                         startServiceFor(miner)
                 }

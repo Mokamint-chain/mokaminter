@@ -39,12 +39,12 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * The specification of a miner.
+ * The specification of a miner. A miner can be written in XML format and is parcelable.
  */
 class Miner: Comparable<Miner>, Parcelable {
 
     /**
-     * The identifier of the miner.
+     * The unique identifier of the miner.
      */
     val uuid: UUID
 
@@ -74,7 +74,7 @@ class Miner: Comparable<Miner>, Parcelable {
     val publicKeyBase58: String
 
     /**
-     * The moment of creation of this miner. This is used to oder miners with
+     * The moment of creation of this miner. This is used to order miners with
      * the same name wrt their creation time.
      */
     val creationTimeUTC: Long
@@ -92,7 +92,6 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val SIGNATURE_FOR_BLOCKS_TAG = "signature-for-blocks"
         private const val PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58_TAG = "public-key-for-signing-blocks-base58"
         private const val PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG = "public-key-for-signing-deadlines-base58"
-
         private const val CREATION_TIME_UTC_TAG = "creation-time-utc"
 
         @Suppress("unused") @JvmField
@@ -115,7 +114,7 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param miningSpecification the specification of the mining endpoint of the miner
      * @param uri the URI where the mining endpoint can be contacted
      * @param size the size of the plot of the miner (number of nonces, strictly positive)
-     * @param publicKeyBase58 the Base58-encoded public key of the miner; this ust be a valid key
+     * @param publicKeyBase58 the Base58-encoded public key of the miner; this must be a valid key
      *                        for the signature algorithm for deadlines of the mining specification
      */
     constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKeyBase58: String) {
@@ -293,6 +292,7 @@ class Miner: Comparable<Miner>, Parcelable {
         return if (diff != 0)
             diff
         else {
+            // if two miners have the same name, we order them by increasing creation time
             diff = creationTimeUTC.compareTo(other.creationTimeUTC)
 
             if (diff != 0)
@@ -340,24 +340,24 @@ class Miner: Comparable<Miner>, Parcelable {
             }
         }
 
+        parser.require(XmlPullParser.END_TAG, null, tag)
+
         if (signatureForBlocks == null)
-            throw XmlPullParserException("Missing signatureForBlocks tag in miner")
+            throw XmlPullParserException("Missing $SIGNATURE_FOR_BLOCKS_TAG in miner")
 
         if (publicKeyForSigningBlocksBase58 == null)
-            throw XmlPullParserException("Missing publicKeyForSigningBlocksBase58 tag in miner")
-
-        parser.require(XmlPullParser.END_TAG, null, tag)
+            throw XmlPullParserException("Missing $PUBLIC_KEY_FOR_SIGNING_BLOCKS_BASE58_TAG in miner")
 
         try {
             return MiningSpecifications.of(
-                name ?: throw XmlPullParserException("Missing name tag in miner"),
-                description ?: throw XmlPullParserException("Missing description tag in miner"),
-                chainId ?: throw XmlPullParserException("Missing chainId tag in miner"),
+                name ?: throw XmlPullParserException("Missing $NAME_TAG in miner"),
+                description ?: throw XmlPullParserException("Missing $DESCRIPTION_TAG in miner"),
+                chainId ?: throw XmlPullParserException("Missing $CHAIN_ID_TAG in miner"),
                 hashingForDeadlines
-                    ?: throw XmlPullParserException("Missing hashingForDeadlines tag in miner"),
+                    ?: throw XmlPullParserException("Missing $HASHING_FOR_DEADLINES_TAG in miner"),
                 signatureForBlocks,
                 signatureForDeadlines
-                    ?: throw XmlPullParserException("Missing signatureForDeadlines tag in miner"),
+                    ?: throw XmlPullParserException("Missing $SIGNATURE_FOR_DEADLINES_TAG in miner"),
                 signatureForBlocks.publicKeyFromEncoding(
                     Base58.fromBase58String(
                         publicKeyForSigningBlocksBase58,

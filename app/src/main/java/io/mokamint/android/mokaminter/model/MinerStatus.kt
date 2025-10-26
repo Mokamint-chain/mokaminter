@@ -16,8 +16,6 @@ limitations under the License.
 
 package io.mokamint.android.mokaminter.model
 
-import android.content.Context
-import io.mokamint.android.mokaminter.R
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
@@ -45,7 +43,7 @@ class MinerStatus {
 
     /**
      * True if and only if the plot for the miner has been fully created and is
-     * available in the local storage of the app.
+     * available in the internal storage of the app.
      */
     var hasPlotReady: Boolean
         private set

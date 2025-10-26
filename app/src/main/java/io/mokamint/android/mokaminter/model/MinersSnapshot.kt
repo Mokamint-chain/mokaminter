@@ -25,6 +25,10 @@ import java.util.function.BiConsumer
 interface MinersSnapshot {
 
     companion object {
+
+        /**
+         * Yields an empty snapshot.
+         */
         fun empty(): MinersSnapshot {
             return object: MinersSnapshot {
                 override fun size(): Int {

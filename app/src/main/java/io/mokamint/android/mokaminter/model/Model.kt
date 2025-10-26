@@ -26,7 +26,7 @@ import io.mokamint.android.mokaminter.MVC
 class Model(mvc: MVC) {
 
     /**
-     * The miners of the user.
+     * The currently existing miners.
      */
     val miners = Miners(mvc)
 }

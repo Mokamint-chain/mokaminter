@@ -22,6 +22,10 @@ import android.content.Intent
 import android.util.Log
 import io.mokamint.android.mokaminter.MVC
 
+/**
+ * A receiver of a request to stop a miner. This is used to stop a miner
+ * when clicking on an action button in the foreground notification of the mining activity.
+ */
 class StopMiningReceiver: BroadcastReceiver() {
 
     companion object {

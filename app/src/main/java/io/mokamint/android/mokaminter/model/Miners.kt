@@ -29,7 +29,7 @@ import java.util.UUID
 import java.util.function.BiConsumer
 
 /**
- * The set of miners. They are constrained to have distinct name.
+ * The set of miners.
  *
  * @param mvc the MVC triple
  */
@@ -38,8 +38,8 @@ class Miners(private val mvc: MVC) {
     /**
      * The miners contained in this container, with their status.
      * Access to this map is synchronized in order to guarantee its
-     * consistency and its alignment with the file containing the
-     * same information on persistent storage.
+     * consistency and its alignment with the XML file containing the
+     * same information in the persistent internal storage of the app.
      */
     @GuardedBy("itself")
     private val miners = HashMap<Miner, MinerStatus>()
@@ -58,7 +58,7 @@ class Miners(private val mvc: MVC) {
     }
 
     /**
-     * Loads the set of miners from the XML file on disk.
+     * Loads the set of miners from the XML file on persistent storage.
      */
     fun reload(): MinersSnapshot {
         synchronized (miners) {
@@ -108,7 +108,7 @@ class Miners(private val mvc: MVC) {
      */
     fun markHasPlot(miner: Miner): Boolean {
         synchronized (miners) {
-            var status = miners[miner]
+            val status = miners[miner]
 
             if (status != null && status.markPlotReady()) {
                 writeIntoInternalStorage()
@@ -129,7 +129,7 @@ class Miners(private val mvc: MVC) {
      */
     fun markAsOn(miner: Miner): Boolean {
         synchronized (miners) {
-            var status = miners[miner]
+            val status = miners[miner]
 
             if (status != null && status.turnOn()) {
                 writeIntoInternalStorage()
@@ -150,7 +150,7 @@ class Miners(private val mvc: MVC) {
      */
     fun markAsOff(miner: Miner): Boolean {
         synchronized (miners) {
-            var status = miners[miner]
+            val status = miners[miner]
 
             if (status != null && status.turnOff()) {
                 writeIntoInternalStorage()
@@ -172,7 +172,7 @@ class Miners(private val mvc: MVC) {
      */
     fun setBalance(miner: Miner, balance: BigInteger): Boolean {
         synchronized (miners) {
-            var status = miners[miner]
+            val status = miners[miner]
             if (status != null) {
                 if (status.balance != balance) {
                     status.setBalance(balance)
@@ -242,6 +242,46 @@ class Miners(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Populates this container with a miner/status pair read from the given XML parser.
+     *
+     * @param parser the parser for reading from the XML file
+     */
+    private fun readMinerSpecification(parser: XmlPullParser) {
+        val tag = parser.name
+        var miner: Miner? = null
+        var status: MinerStatus? = null
+
+        while (parser.next() != XmlPullParser.END_TAG)
+            if (parser.eventType == XmlPullParser.START_TAG)
+                when (parser.name) {
+                    MINER_TAG -> miner = Miner(parser)
+                    STATUS_TAG -> status = MinerStatus(parser)
+                    else -> skip(parser)
+                }
+
+        miners.put(
+            miner ?: throw XmlPullParserException("Missing $MINER_TAG in miner specification"),
+            status ?: throw XmlPullParserException("Missing $STATUS_TAG in miner specification")
+        )
+
+        parser.require(XmlPullParser.END_TAG, null, tag)
+    }
+
+    private fun skip(parser: XmlPullParser) {
+        var depth = 1
+        do {
+            when (parser.next()) {
+                XmlPullParser.END_TAG -> depth--
+                XmlPullParser.START_TAG -> depth++
+            }
+        }
+        while (depth != 0)
+    }
+
+    /**
+     * Reads this set of miners from the XML file in the internal storage of the app.
+     */
     private fun readFromInternalStorage() {
         try {
             mvc.openFileInput(FILENAME).use {
@@ -265,38 +305,6 @@ class Miners(private val mvc: MVC) {
             // this is fine: initially the file of the miners is missing
             Log.w(TAG, "Missing file $FILENAME: it will be created from scratch")
         }
-    }
-
-    private fun readMinerSpecification(parser: XmlPullParser) {
-        val tag = parser.name
-        var miner: Miner? = null
-        var status: MinerStatus? = null
-
-        while (parser.next() != XmlPullParser.END_TAG)
-            if (parser.eventType == XmlPullParser.START_TAG)
-                when (parser.name) {
-                    MINER_TAG -> miner = Miner(parser)
-                    STATUS_TAG -> status = MinerStatus(parser)
-                    else -> skip(parser)
-                }
-
-        miners.put(
-            miner ?: throw XmlPullParserException("Missing miner in miner specification"),
-            status ?: throw XmlPullParserException("Missing status in miner specification")
-        )
-
-        parser.require(XmlPullParser.END_TAG, null, tag)
-    }
-
-    private fun skip(parser: XmlPullParser) {
-        var depth = 1
-        do {
-            when (parser.next()) {
-                XmlPullParser.END_TAG -> depth--
-                XmlPullParser.START_TAG -> depth++
-            }
-        }
-        while (depth != 0)
     }
 
     /**

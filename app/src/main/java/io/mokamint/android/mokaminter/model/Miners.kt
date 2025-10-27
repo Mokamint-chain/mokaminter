@@ -20,6 +20,7 @@ import android.content.Context
 import android.util.Log
 import android.util.Xml
 import androidx.annotation.GuardedBy
+import io.hotmoka.annotations.ThreadSafe
 import io.mokamint.android.mokaminter.MVC
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
@@ -33,6 +34,7 @@ import java.util.function.BiConsumer
  *
  * @param mvc the MVC triple
  */
+@ThreadSafe
 class Miners(private val mvc: MVC) {
 
     /**

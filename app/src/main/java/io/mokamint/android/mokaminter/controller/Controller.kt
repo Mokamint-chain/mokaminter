@@ -31,7 +31,6 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.os.PersistableBundle
 import android.util.Log
-import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresApi
 import androidx.annotation.UiThread
 import androidx.core.app.NotificationCompat
@@ -62,6 +61,7 @@ import io.mokamint.nonce.api.Deadline
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
@@ -90,11 +90,6 @@ class Controller(private val mvc: MVC) {
      * progress bar activity has been requested.
      */
     private val working = AtomicInteger(0)
-
-    /**
-     * A lock used to serialize modifications to the set of miners.
-     */
-    private val minersLock = Object()
 
     /**
      * A map from active miners to their servicing object.
@@ -133,7 +128,7 @@ class Controller(private val mvc: MVC) {
             .enqueueUniqueWork("update", ExistingWorkPolicy.REPLACE, minersUpdateRequest)
     }
 
-    @GuardedBy("this.minersLock")
+    @UiThread
     private fun startServiceFor(miner: Miner) {
         val old = services[miner]
         val new = services.computeIfAbsent(miner) { m -> createService(m) }
@@ -198,7 +193,6 @@ class Controller(private val mvc: MVC) {
         return services[miner]?.isConnected == true
     }
 
-    @GuardedBy("this.minersLock")
     private fun createService(miner: Miner): ReconnectingMinerService {
         val filename = "${miner.uuid}.plot"
         val path = mvc.filesDir.toPath().resolve(filename)
@@ -232,9 +226,11 @@ class Controller(private val mvc: MVC) {
 
             override fun onDeadlineComputed(deadline: Deadline?) {
                 super.onDeadlineComputed(deadline)
-                mainScope.launch { mvc.view?.onDeadlineComputed(miner) }
-                if (deadlines++ % DEADLINES_FOR_BALANCE_FETCH == 0) {
-                    safeRunAsIO(false) { fetchBalanceOf(miner) }
+
+                mainScope.launch {
+                    mvc.view?.onDeadlineComputed(miner)
+                    if (deadlines++ % DEADLINES_FOR_BALANCE_FETCH == 0)
+                        ioScope.launch { fetchBalanceOf(miner) }
                 }
             }
         }
@@ -247,75 +243,72 @@ class Controller(private val mvc: MVC) {
 
     @UiThread
     fun onMinersReloadRequested() {
-        safeRunAsIO {
-            synchronized (minersLock) {
-                mvc.model.miners.reload().forEach { miner, status ->
-                    if (status.isOn && status.hasPlotReady)
-                        startServiceFor(miner)
-                }
+        mainScope.launch {
+            val snapshot = ioScope.async { mvc.model.miners.reload() }.await()
+            snapshot.forEach { miner, status ->
+                if (status.isOn && status.hasPlotReady)
+                    startServiceFor(miner)
             }
 
             Log.i(TAG, "Reloaded the list of miners")
-            mainScope.launch { mvc.view?.onMinersReloaded() }
+            mvc.view?.onMinersReloaded()
         }
     }
 
     @UiThread
     fun onBalancesReloadRequested() {
-        safeRunAsIO {
-            mvc.model.miners.snapshot().forEach { miner, status ->
+        mainScope.launch {
+            val snapshot = ioScope.async { mvc.model.miners.reload() }.await()
+            snapshot.forEach { miner, status ->
                 if (status.isOn && status.hasPlotReady)
-                    fetchBalanceOf(miner)
+                    ioScope.launch { fetchBalanceOf(miner) }
             }
 
-            Log.i(TAG, "Fetched the balances of all miners")
+            Log.i(TAG, "Reloaded the list of miners")
+            mvc.view?.onMinersReloaded()
         }
     }
 
     private fun fetchBalanceOf(miner: Miner) {
-        if (hasConnectedServiceFor(miner)) {
-            try {
-                Log.d(TAG, "Asking balance of $miner")
-                val balance = services[miner]?.getBalance(
-                    miner.miningSpecification.signatureForDeadlines,
-                    miner.publicKey
-                )
+        services[miner]?.let { service ->
+            if (service.isConnected) {
+                try {
+                    Log.d(TAG, "Asking balance of $miner")
+                    val balance = service.getBalance(
+                        miner.miningSpecification.signatureForDeadlines,
+                        miner.publicKey
+                    )
 
-                if (balance != null) {
-                    Log.d(TAG, "Fetched balance $balance of $miner")
-                    var done = false
-
-                    synchronized(minersLock) {
-                        done = mvc.model.miners.setBalance(miner, balance.orElse(BigInteger.ZERO))
+                    balance?.let { it ->
+                        Log.d(TAG, "Fetched balance $it of $miner")
+                        var done = mvc.model.miners.setBalance(miner, it.orElse(BigInteger.ZERO))
+                        if (done)
+                            mainScope.launch { mvc.view?.onBalanceChanged(miner) }
                     }
-
-                    if (done)
-                        mainScope.launch { mvc.view?.onBalanceChanged(miner) }
+                } catch (e: ClosedMinerException) {
+                    Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
+                } catch (e: TimeoutException) {
+                    Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
                 }
-            }
-            catch (e: ClosedMinerException) {
-                Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
-            }
-            catch (e: TimeoutException) {
-                Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
             }
         }
     }
 
     @UiThread
     fun onDeleteRequested(miner: Miner) {
-        safeRunAsIO(false) {
-            var service: ReconnectingMinerService? = null
+        mainScope.launch {
+            val removed = ioScope.async { mvc.model.miners.remove(miner) }.await()
+            if (removed) {
+                services.remove(miner)?.let { service ->
+                    mvc.view?.onDeleted(miner)
 
-            synchronized (minersLock) {
-                if (mvc.model.miners.remove(miner))
-                    service = services.remove(miner)
-            }
-
-            if (service != null) {
-                mainScope.launch { mvc.view?.onDeleted(miner) }
-                service.close()
-                deletePlotOf(miner)
+                    // close() might take some time and the user might be puzzled by the
+                    // presence of the progress bar // TODO
+                    safeRunAsIO(false) {
+                        service.close()
+                        deletePlotOf(miner)
+                    }
+                }
             }
         }
     }
@@ -330,33 +323,26 @@ class Controller(private val mvc: MVC) {
 
     @UiThread
     fun onTurnOnRequested(miner: Miner) {
-        safeRunAsIO {
-            var done = false
-
-            synchronized (minersLock) {
-                done = mvc.model.miners.markAsOn(miner)
-                if (done)
-                    startServiceFor(miner)
+        mainScope.launch {
+            val done = ioScope.async { mvc.model.miners.markAsOn(miner) }.await()
+            if (done) {
+                startServiceFor(miner)
+                mvc.view?.onTurnedOn(miner)
             }
-
-            if (done)
-                mainScope.launch { mvc.view?.onTurnedOn(miner) }
         }
     }
 
     @UiThread
     fun onTurnOffRequested(miner: Miner) {
-        safeRunAsIO(false) {
-            var service: ReconnectingMinerService? = null
-
-            synchronized (minersLock) {
-                if (mvc.model.miners.markAsOff(miner))
-                    service = services.remove(miner)
-            }
-
-            if (service != null) {
-                mainScope.launch { mvc.view?.onTurnedOff(miner) }
-                service.close()
+        mainScope.launch {
+            val done = ioScope.async { mvc.model.miners.markAsOff(miner) }.await()
+            if (done) {
+                services.remove(miner)?.let { service ->
+                    // close() might take some time and the user might be puzzled by the
+                    // presence of the progress bar // TODO
+                    safeRunAsIO(false) { service.close() }
+                    mvc.view?.onTurnedOff(miner)
+                }
             }
         }
     }
@@ -527,12 +513,12 @@ class Controller(private val mvc: MVC) {
 
         companion object {
             const val MINER_UUID = "miner_uuid"
-            var counter: Int = 0
         }
 
         private var latches = ConcurrentHashMap<UUID, CountDownLatch>()
 
         @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+        @UiThread
         override fun onStartJob(params: JobParameters): Boolean {
             val mvc = applicationContext as MVC
             val controller = mvc.controller
@@ -545,7 +531,7 @@ class Controller(private val mvc: MVC) {
                 return false
             }
 
-            val service = controller.services.get(miner)
+            val service = controller.services[miner]
             if (service == null) {
                 Log.w(TAG, "The service of the miner with uuid $uuid cannot be found!")
                 jobFinished(params, false)
@@ -607,7 +593,7 @@ class Controller(private val mvc: MVC) {
                 return Result.failure()
             }
 
-            val service = controller.services.get(miner)
+            val service = controller.services[miner]
             if (service == null) {
                 Log.w(TAG, "The service of the miner with uuid $uuid cannot be found!")
                 return Result.failure()
@@ -679,13 +665,12 @@ class Controller(private val mvc: MVC) {
 
             Log.i(TAG, "Completed creation of $path for miner $miner")
 
-            synchronized (controller.minersLock) {
-                if (mvc.model.miners.markHasPlot(miner)) {
-                    controller.mainScope.launch { mvc.view?.onPlotCreationCompleted(miner) }
+            if (mvc.model.miners.markHasPlot(miner)) {
+                controller.mainScope.launch {
                     controller.startServiceFor(miner)
+                    mvc.view?.onPlotCreationCompleted(miner)
                 }
-                else controller.deletePlotOf(miner)
-            }
+            } else controller.deletePlotOf(miner)
 
             return Result.success()
         }
@@ -693,27 +678,35 @@ class Controller(private val mvc: MVC) {
 
     @UiThread
     fun onPlotCreationRequested(miner: Miner) {
-        mvc.view?.onPlotCreationConfirmed(miner)
+        mainScope.launch {
+            mvc.view?.onPlotCreationConfirmed(miner)
 
-        val status = MinerStatus(BigInteger.ZERO,
-            hasPlotReady = false,
-            isOn = true,
-            -1L
-        )
+            val status = MinerStatus(
+                BigInteger.ZERO,
+                hasPlotReady = false,
+                isOn = true,
+                -1L
+            )
 
-        synchronized (minersLock) {
-            mvc.model.miners.add(miner, status)
+            ioScope.async { mvc.model.miners.add(miner, status) }.await()
+
+            mvc.view?.onAdded(miner)
+
+            val plotCreationRequest =
+                OneTimeWorkRequestBuilder<PlotCreationWorker>()
+                    .setInputData(
+                        workDataOf(
+                            Pair(
+                                PlotCreationWorker.MINER_UUID,
+                                miner.uuid.toString()
+                            )
+                        )
+                    )
+                    .build()
+
+            WorkManager.getInstance(mvc)
+                .enqueue(plotCreationRequest)
         }
-
-        mvc.view?.onAdded(miner)
-
-        val plotCreationRequest =
-            OneTimeWorkRequestBuilder<PlotCreationWorker>()
-                .setInputData(workDataOf(Pair(PlotCreationWorker.MINER_UUID, miner.uuid.toString())))
-                .build()
-
-        WorkManager.getInstance(mvc)
-            .enqueue(plotCreationRequest)
     }
 
     private fun safeRunAsIO(showProgressBar: Boolean = true, task: () -> Unit) {

@@ -18,27 +18,16 @@ package io.mokamint.android.mokaminter.controller
 
 import android.app.Notification
 import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.job.JobInfo
-import android.app.job.JobParameters
-import android.app.job.JobScheduler
-import android.app.job.JobService
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-import android.net.NetworkRequest
 import android.os.Build
-import android.os.PersistableBundle
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.annotation.UiThread
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -51,13 +40,8 @@ import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.MinerStatus
 import io.mokamint.android.mokaminter.view.Mokaminter
-import io.mokamint.miner.api.ClosedMinerException
 import io.mokamint.miner.api.MiningSpecification
-import io.mokamint.miner.local.LocalMiners
-import io.mokamint.miner.service.AbstractReconnectingMinerService
 import io.mokamint.miner.service.MinerServices
-import io.mokamint.miner.service.api.ReconnectingMinerService
-import io.mokamint.nonce.api.Deadline
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,10 +52,7 @@ import java.io.FileNotFoundException
 import java.math.BigInteger
 import java.net.URI
 import java.security.spec.InvalidKeySpecException
-import java.util.Optional
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
@@ -91,10 +72,7 @@ class Controller(private val mvc: MVC) {
      */
     private val working = AtomicInteger(0)
 
-    /**
-     * A map from active miners to their servicing object.
-     */
-    private val services = ConcurrentHashMap<Miner, ReconnectingMinerService>()
+    val miningServices = MiningServices(mvc)
 
     companion object {
         private val TAG = Controller::class.simpleName
@@ -104,12 +82,6 @@ class Controller(private val mvc: MVC) {
          * updates of the last updated information of the miners.
          */
         private const val MINERS_REDRAW_INTERVAL = 10_000L // ten seconds
-
-        /**
-         * The number of deadlines that must be computed before triggering a new
-         * fetch of the balance of a miner.
-         */
-        private const val DEADLINES_FOR_BALANCE_FETCH = 200
 
         private val nextId = AtomicInteger(100)
     }
@@ -129,111 +101,8 @@ class Controller(private val mvc: MVC) {
     }
 
     @UiThread
-    private fun startServiceFor(miner: Miner) {
-        val old = services[miner]
-        val new = services.computeIfAbsent(miner) { m -> createService(m) }
-
-        // if a service has been created for the miner, then we protect it with
-        // a foreground work that forces the app to stay alive and not get
-        // stopped/garbage-collected by the system
-        if (old != new) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                // older Android versions will use the WorkManager, while newer
-                // versions have a quota limit on the WorkManager and therefore will rather
-                // use the JobScheduler; which, however, is not available in previous versions,
-                // so that both possibilities must be taken into account...
-                Log.i(TAG, "using the WorkManager")
-                val serviceWatcherRequest =
-                    OneTimeWorkRequestBuilder<MiningWatcherWorker>()
-                        .setInputData(
-                            workDataOf(
-                                Pair(ControllerWorker.VISIBLE_TO_USER, false),
-                                Pair(MiningWatcherWorker.MINER_UUID, miner.uuid.toString())
-                            )
-                        )
-                        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                        .build()
-
-                WorkManager.getInstance(mvc)
-                    .enqueueUniqueWork(
-                        miner.uuid.toString(),
-                        ExistingWorkPolicy.REPLACE,
-                        serviceWatcherRequest
-                    )
-            }
-            else {
-                // newer Android versions
-                Log.i(TAG, "using the JobScheduler")
-                val networkRequest = NetworkRequest.Builder()
-                    .build()
-
-                val args = PersistableBundle()
-                args.putString(MiningWatcherJobService.MINER_UUID, miner.uuid.toString())
-
-                val jobInfo = JobInfo.Builder(miner.uuid.hashCode(),
-                    ComponentName(mvc, MiningWatcherJobService::class.java))
-                    .setUserInitiated(true)
-                    .setPriority(JobInfo.PRIORITY_MAX)
-                    .setRequiredNetwork(networkRequest)
-                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                    .setEstimatedNetworkBytes(1024L * 1024 * 1024, 1024L * 1024 * 1024)
-                    .setExtras(args)
-                    .build()
-
-                val jobScheduler = mvc.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-                val result = jobScheduler.schedule(jobInfo)
-                if (result != JobScheduler.RESULT_SUCCESS)
-                    Log.w(TAG, "Could not schedule job: $result")
-            }
-        }
-    }
-
-    @UiThread
     fun hasConnectedServiceFor(miner: Miner): Boolean {
-        return services[miner]?.isConnected == true
-    }
-
-    private fun createService(miner: Miner): ReconnectingMinerService {
-        val filename = "${miner.uuid}.plot"
-        val path = mvc.filesDir.toPath().resolve(filename)
-        val plot = Plots.load(path)
-
-        val localMiner = LocalMiners.of(
-            "Local miner for ${miner.miningSpecification.name}",
-            "A miner working for ${miner.uri}",
-            { signature, publicKey -> Optional.empty() },
-            plot
-        )
-
-        return object :
-            AbstractReconnectingMinerService(Optional.of(localMiner), miner.uri, 30000, 30000) {
-
-            /**
-             * A counter of the deadlines computed with this service, used
-             * to decide when to reload the balance of the corresponding miner.
-             */
-            private var deadlines: Int = 0
-
-            override fun onConnected() {
-                super.onConnected()
-                mainScope.launch { mvc.view?.onConnected(miner) }
-            }
-
-            override fun onDisconnected() {
-                super.onDisconnected()
-                mainScope.launch { mvc.view?.onDisconnected(miner) }
-            }
-
-            override fun onDeadlineComputed(deadline: Deadline?) {
-                super.onDeadlineComputed(deadline)
-
-                mainScope.launch {
-                    mvc.view?.onDeadlineComputed(miner)
-                    if (deadlines++ % DEADLINES_FOR_BALANCE_FETCH == 0)
-                        ioScope.launch { fetchBalanceOf(miner) }
-                }
-            }
-        }
+        return miningServices.hasConnectedServiceFor(miner)
     }
 
     @UiThread
@@ -247,7 +116,7 @@ class Controller(private val mvc: MVC) {
             val snapshot = ioScope.async { mvc.model.miners.reload() }.await()
             snapshot.forEach { miner, status ->
                 if (status.isOn && status.hasPlotReady)
-                    startServiceFor(miner)
+                    miningServices.ensureServiceFor(miner)
             }
 
             Log.i(TAG, "Reloaded the list of miners")
@@ -269,29 +138,8 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    private fun fetchBalanceOf(miner: Miner) {
-        services[miner]?.let { service ->
-            if (service.isConnected) {
-                try {
-                    Log.d(TAG, "Asking balance of $miner")
-                    val balance = service.getBalance(
-                        miner.miningSpecification.signatureForDeadlines,
-                        miner.publicKey
-                    )
-
-                    balance?.let { it ->
-                        Log.d(TAG, "Fetched balance $it of $miner")
-                        var done = mvc.model.miners.setBalance(miner, it.orElse(BigInteger.ZERO))
-                        if (done)
-                            mainScope.launch { mvc.view?.onBalanceChanged(miner) }
-                    }
-                } catch (e: ClosedMinerException) {
-                    Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
-                } catch (e: TimeoutException) {
-                    Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
-                }
-            }
-        }
+    fun fetchBalanceOf(miner: Miner) {
+        miningServices.fetchBalanceOf(miner)
     }
 
     @UiThread
@@ -299,16 +147,9 @@ class Controller(private val mvc: MVC) {
         mainScope.launch {
             val removed = ioScope.async { mvc.model.miners.remove(miner) }.await()
             if (removed) {
-                services.remove(miner)?.let { service ->
-                    mvc.view?.onDeleted(miner)
-
-                    // close() might take some time and the user might be puzzled by the
-                    // presence of the progress bar // TODO
-                    safeRunAsIO(false) {
-                        service.close()
-                        deletePlotOf(miner)
-                    }
-                }
+                miningServices.stopServiceFor(miner)
+                mvc.view?.onDeleted(miner)
+                deletePlotOf(miner)
             }
         }
     }
@@ -326,7 +167,7 @@ class Controller(private val mvc: MVC) {
         mainScope.launch {
             val done = ioScope.async { mvc.model.miners.markAsOn(miner) }.await()
             if (done) {
-                startServiceFor(miner)
+                miningServices.ensureServiceFor(miner)
                 mvc.view?.onTurnedOn(miner)
             }
         }
@@ -337,49 +178,21 @@ class Controller(private val mvc: MVC) {
         mainScope.launch {
             val done = ioScope.async { mvc.model.miners.markAsOff(miner) }.await()
             if (done) {
-                services.remove(miner)?.let { service ->
-                    // close() might take some time and the user might be puzzled by the
-                    // presence of the progress bar // TODO
-                    safeRunAsIO(false) { service.close() }
-                    mvc.view?.onTurnedOff(miner)
-                }
+                miningServices.stopServiceFor(miner)
+                mvc.view?.onTurnedOff(miner)
             }
         }
     }
 
-    private fun createNotification(title: String, description: String, stopIntent: PendingIntent?, isOngoing: Boolean): Notification {
-        val builder = NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
+    private fun createNotification(title: String, description: String): Notification {
+        return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
             .setContentTitle(title)
             .setContentText(description)
             .setSmallIcon(R.drawable.ic_active_miner)
-            .setOngoing(isOngoing)
+            .setOngoing(false)
             .setAutoCancel(false)
             .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
-
-        stopIntent?.let { it ->
-            builder.addAction(R.drawable.ic_delete, mvc.getString(R.string.turnOff), it)
-        }
-
-        return builder.build()
-    }
-
-    private fun createActiveMiningNotification(miner: Miner): Notification {
-        val stopIntent = Intent(mvc, StopMiningReceiver::class.java)
-        stopIntent.putExtra(StopMiningReceiver.UUID, miner.uuid.toString())
-        val stopMiningIntent = PendingIntent.getBroadcast(
-            mvc, nextId.getAndIncrement(), stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return createNotification(
-            mvc.getString(R.string.notification_miner_is_active),
-            mvc.getString(
-                R.string.notification_miner_is_active_description,
-                miner.miningSpecification.name
-            ),
-            stopMiningIntent,
-            true
-        )
+            .build()
     }
 
     /**
@@ -432,6 +245,39 @@ class Controller(private val mvc: MVC) {
         }
 
         return uuid
+    }
+
+    @UiThread
+    fun onPlotCreationRequested(miner: Miner) {
+        mainScope.launch {
+            mvc.view?.onPlotCreationConfirmed(miner)
+
+            val status = MinerStatus(
+                BigInteger.ZERO,
+                hasPlotReady = false,
+                isOn = true,
+                -1L
+            )
+
+            ioScope.async { mvc.model.miners.add(miner, status) }.await()
+
+            mvc.view?.onAdded(miner)
+
+            val plotCreationRequest =
+                OneTimeWorkRequestBuilder<PlotCreationWorker>()
+                    .setInputData(
+                        workDataOf(
+                            Pair(
+                                PlotCreationWorker.MINER_UUID,
+                                miner.uuid.toString()
+                            )
+                        )
+                    )
+                    .build()
+
+            WorkManager.getInstance(mvc)
+                .enqueue(plotCreationRequest)
+        }
     }
 
     /**
@@ -506,109 +352,6 @@ class Controller(private val mvc: MVC) {
     }
 
     /**
-     * A background job that waits for the closure of a mining service, so that the
-     * application remains in foreground until the last miner is turned off.
-     */
-    class MiningWatcherJobService: JobService() {
-
-        companion object {
-            const val MINER_UUID = "miner_uuid"
-        }
-
-        private var latches = ConcurrentHashMap<UUID, CountDownLatch>()
-
-        @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-        @UiThread
-        override fun onStartJob(params: JobParameters): Boolean {
-            val mvc = applicationContext as MVC
-            val controller = mvc.controller
-
-            val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
-            val miner = mvc.model.miners.get(uuid)
-            if (miner == null) {
-                Log.w(TAG, "The miner with uuid $uuid cannot be found!")
-                jobFinished(params, false)
-                return false
-            }
-
-            val service = controller.services[miner]
-            if (service == null) {
-                Log.w(TAG, "The service of the miner with uuid $uuid cannot be found!")
-                jobFinished(params, false)
-                return false
-            }
-
-            val notification = controller.createActiveMiningNotification(miner)
-
-            setNotification(
-                params, nextId.getAndIncrement(), notification, JOB_END_NOTIFICATION_POLICY_REMOVE
-            )
-
-            val latch = CountDownLatch(1)
-            latches.put(uuid, latch)
-
-            // this coroutine waits for the closure of the service and then finishes the job
-            controller.ioScope.launch {
-                latch.await()
-                jobFinished(params, false)
-            }
-
-            controller.ioScope.launch {
-                Log.d(TAG, "Started mining watcher job for $uuid")
-                service.waitUntilClosed()
-                latch.countDown() // the service has been closed
-            }
-
-            return true
-        }
-
-        override fun onStopJob(params: JobParameters): Boolean {
-            val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
-            Log.d(TAG, "System stopped job for miner $uuid")
-            val latch = latches.remove(uuid)
-            latch?.countDown() // we release the waiting coroutine, the job will re rescheduled
-            return true
-        }
-
-        override fun onNetworkChanged(params: JobParameters) {
-            // nothing, just avoid the log line in the super implementation
-        }
-    }
-
-    /**
-     * A background work that waits for the closure of a mining service, so that the
-     * application remains in foreground until the last miner is turned off.
-     */
-    class MiningWatcherWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
-        companion object {
-            const val MINER_UUID = "miner_uuid"
-        }
-
-        override suspend fun doWork(mvc: MVC): Result {
-            val controller = mvc.controller
-            val uuid = UUID.fromString(inputData.getString(MINER_UUID))
-            val miner = mvc.model.miners.get(uuid)
-            if (miner == null) {
-                Log.w(TAG, "The miner with uuid $uuid cannot be found!")
-                return Result.failure()
-            }
-
-            val service = controller.services[miner]
-            if (service == null) {
-                Log.w(TAG, "The service of the miner with uuid $uuid cannot be found!")
-                return Result.failure()
-            }
-
-            val notification = controller.createActiveMiningNotification(miner)
-            publishForegroundNotification(notification)
-            Log.d(TAG, "Started mining watcher work for $uuid")
-            service.waitUntilClosed()
-
-            return Result.success()
-        }
-    }
-
-    /**
      * A background work for the creation of the plot of a miner.
      */
     class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
@@ -634,9 +377,7 @@ class Controller(private val mvc: MVC) {
                 mvc.getString(
                     R.string.notification_plot_creation_description,
                     miner.miningSpecification.name
-                ),
-                null,
-                false
+                )
             )
 
             publishForegroundNotification(notification)
@@ -667,45 +408,12 @@ class Controller(private val mvc: MVC) {
 
             if (mvc.model.miners.markHasPlot(miner)) {
                 controller.mainScope.launch {
-                    controller.startServiceFor(miner)
+                    controller.miningServices.ensureServiceFor(miner)
                     mvc.view?.onPlotCreationCompleted(miner)
                 }
             } else controller.deletePlotOf(miner)
 
             return Result.success()
-        }
-    }
-
-    @UiThread
-    fun onPlotCreationRequested(miner: Miner) {
-        mainScope.launch {
-            mvc.view?.onPlotCreationConfirmed(miner)
-
-            val status = MinerStatus(
-                BigInteger.ZERO,
-                hasPlotReady = false,
-                isOn = true,
-                -1L
-            )
-
-            ioScope.async { mvc.model.miners.add(miner, status) }.await()
-
-            mvc.view?.onAdded(miner)
-
-            val plotCreationRequest =
-                OneTimeWorkRequestBuilder<PlotCreationWorker>()
-                    .setInputData(
-                        workDataOf(
-                            Pair(
-                                PlotCreationWorker.MINER_UUID,
-                                miner.uuid.toString()
-                            )
-                        )
-                    )
-                    .build()
-
-            WorkManager.getInstance(mvc)
-                .enqueue(plotCreationRequest)
         }
     }
 

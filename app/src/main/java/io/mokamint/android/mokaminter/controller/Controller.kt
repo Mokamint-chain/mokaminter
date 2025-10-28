@@ -83,8 +83,6 @@ class Controller(private val mvc: MVC) {
          * updates of the last updated information of the miners.
          */
         private const val MINERS_REDRAW_INTERVAL = 10_000L // ten seconds
-
-        private val nextId = AtomicInteger(100)
     }
 
     /**
@@ -192,17 +190,6 @@ class Controller(private val mvc: MVC) {
 
         val shareIntent = Intent.createChooser(sendIntent, null)
         context.startActivity(shareIntent)
-    }
-
-    private fun createNotification(title: String, description: String): Notification {
-        return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
-            .setContentTitle(title)
-            .setContentText(description)
-            .setSmallIcon(R.drawable.ic_active_miner)
-            .setOngoing(false)
-            .setAutoCancel(false)
-            .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
-            .build()
     }
 
     /**
@@ -330,9 +317,7 @@ class Controller(private val mvc: MVC) {
             }
         }
 
-        protected suspend fun publishForegroundNotification(notification: Notification) {
-            val id = nextId.getAndIncrement()
-
+        protected suspend fun publishForegroundNotification(notification: Notification, id: Int) {
             val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
                 ForegroundInfo(id, notification)
             else
@@ -368,6 +353,7 @@ class Controller(private val mvc: MVC) {
 
         companion object {
             const val MINER_UUID = "miner_uuid"
+            private val nextId = AtomicInteger(100)
         }
 
         override suspend fun doWork(mvc: MVC): Result {
@@ -382,15 +368,9 @@ class Controller(private val mvc: MVC) {
                 return Result.failure()
             }
 
-            val notification = controller.createNotification(
-                mvc.getString(R.string.notification_plot_creation_title),
-                mvc.getString(
-                    R.string.notification_plot_creation_description,
-                    miner.miningSpecification.name
-                )
-            )
-
-            publishForegroundNotification(notification)
+            val id = nextId.getAndIncrement()
+            val notification = createNotification(miner, 0, mvc)
+            publishForegroundNotification(notification, id)
 
             val filename = "$uuid.plot"
             val path = mvc.filesDir.toPath().resolve(filename)
@@ -402,7 +382,11 @@ class Controller(private val mvc: MVC) {
                     path, miner.getProlog(), 0, miner.plotSize,
                     miner.miningSpecification.hashingForDeadlines
                 ) { percent ->
-                    controller.mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }
+                    val notification = createNotification(miner, percent, mvc)
+                    controller.mainScope.launch {
+                        mvc.view?.onPlotCreationTick(miner, percent)
+                        publishForegroundNotification(notification, id)
+                    }
                     Log.i(TAG, "Created $percent% of plot $path")
                 }
             } catch (_: FileNotFoundException) {
@@ -424,6 +408,25 @@ class Controller(private val mvc: MVC) {
             } else controller.deletePlotOf(miner)
 
             return Result.success()
+        }
+
+        private fun createNotification(miner: Miner, percent: Int, mvc: MVC): Notification {
+            val title = mvc.getString(
+                R.string.notification_plot_creation_title,
+                miner.miningSpecification.name
+            )
+
+            val description =
+                mvc.getString(R.string.notification_plot_creation_in_progress, percent)
+
+            return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
+                .setContentTitle(title)
+                .setContentText(description)
+                .setSmallIcon(R.drawable.ic_active_miner)
+                .setOngoing(false)
+                .setAutoCancel(false)
+                .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
+                .build()
         }
     }
 

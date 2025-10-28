@@ -132,9 +132,6 @@ class Controller(private val mvc: MVC) {
                 if (status.isOn && status.hasPlotReady)
                     ioScope.launch { fetchBalanceOf(miner) }
             }
-
-            Log.i(TAG, "Reloaded the list of miners")
-            mvc.view?.onMinersReloaded()
         }
     }
 

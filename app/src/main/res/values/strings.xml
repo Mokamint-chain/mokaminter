@@ -61,7 +61,7 @@
     <string name="miner_card_balance">balance: %1$s</string>
     <string name="miner_card_last_updated">last updated: %1$s</string>
     <string name="notification_mining_activity">Mining activity</string>
-    <string name="notification_miner_is_active">The Mokamint miner is active</string>
+    <string name="notification_tap_to_show_miners">Tap to show miners</string>
     <string name="notification_pause_mining">Pause mining</string>
     <string name="menu_settings">Settings</string>
     <string name="source_code_uri">Source code: https://github.com/Mokamint-chain/mokaminter</string>
@@ -82,7 +82,7 @@
     <string name="action_turn_off_miner">Turn off</string>
     <string name="notification_plot_creation_title">Plot creation</string>
     <string name="notification_plot_creation_description">The creation of the plot file for miner %1$s is in progress</string>
-    <string name="notification_miner_is_active_description">Mining for %1$s</string>
+    <string name="notification_mining_active">Mokamint mining for %1$s</string>
     <string name="cannot_contact">Cannot contact %1$s</string>
     <string name="never">never</string>
     <string name="in_the_future">in the future</string>

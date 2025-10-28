@@ -80,11 +80,12 @@ class MiningServices(private val mvc: MVC) {
                 getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             }
 
-            val title = mvc.getString(R.string.notification_miner_is_active)
-            val description = mvc.getString(
-                R.string.notification_miner_is_active_description,
+            val title = mvc.getString(
+                R.string.notification_mining_active,
                 miner.miningSpecification.name
             )
+
+            val description = mvc.getString(R.string.notification_tap_to_show_miners)
 
             return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
                 .setContentTitle(title)

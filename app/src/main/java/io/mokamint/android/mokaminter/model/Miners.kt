@@ -54,7 +54,7 @@ class Miners(private val mvc: MVC) {
         private const val FILENAME = "miners.txt"
         private const val MINERS_TAG = "miners"
         private const val MINER_SPECIFICATION_TAG = "miner-specification"
-        private const val MINER_TAG = "miner"
+        const val MINER_TAG = "miner"
         private const val STATUS_TAG = "status"
         private val TAG = Miners::class.simpleName
     }

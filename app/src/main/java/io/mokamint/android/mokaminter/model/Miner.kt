@@ -18,11 +18,13 @@ package io.mokamint.android.mokaminter.model
 
 import android.os.Parcel
 import android.os.Parcelable
+import android.util.Xml
 import io.hotmoka.crypto.Base58
 import io.hotmoka.crypto.HashingAlgorithms
 import io.hotmoka.crypto.SignatureAlgorithms
 import io.hotmoka.crypto.api.HashingAlgorithm
 import io.hotmoka.crypto.api.SignatureAlgorithm
+import io.mokamint.android.mokaminter.model.Miners.Companion.MINER_TAG
 import io.mokamint.miner.MiningSpecifications
 import io.mokamint.miner.api.MiningSpecification
 import io.mokamint.nonce.Prologs
@@ -30,6 +32,7 @@ import io.mokamint.nonce.api.Prolog
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 import org.xmlpull.v1.XmlSerializer
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URISyntaxException
 import java.security.NoSuchAlgorithmException
@@ -61,7 +64,7 @@ class Miner: Comparable<Miner>, Parcelable {
     /**
      * The size of the plot of the miner (number of nonces).
      */
-    val size: Long
+    val plotSize: Long
 
     /**
      * The public key of the miner, derived from entropy, password and signature algorithm for deadlines.
@@ -83,7 +86,7 @@ class Miner: Comparable<Miner>, Parcelable {
         private const val UUID_TAG = "uuid"
         private const val MINING_SPECIFICATION_TAG = "mining-specification"
         private const val URI_TAG = "uri"
-        private const val SIZE_TAG = "size"
+        private const val PLOT_SIZE_TAG = "plot-size"
         private const val NAME_TAG = "name"
         private const val DESCRIPTION_TAG = "description"
         private const val CHAIN_ID_TAG = "chain-id"
@@ -113,20 +116,20 @@ class Miner: Comparable<Miner>, Parcelable {
      * @param uuid the identifier to use for the miner
      * @param miningSpecification the specification of the mining endpoint of the miner
      * @param uri the URI where the mining endpoint can be contacted
-     * @param size the size of the plot of the miner (number of nonces, strictly positive)
+     * @param plotSize the size of the plot of the miner (number of nonces, strictly positive)
      * @param publicKeyBase58 the Base58-encoded public key of the miner; this must be a valid key
      *                        for the signature algorithm for deadlines of the mining specification
      */
-    constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, size: Long, publicKeyBase58: String) {
+    constructor(uuid: UUID, miningSpecification: MiningSpecification, uri: URI, plotSize: Long, publicKeyBase58: String) {
         this.uuid = uuid
         this.miningSpecification = miningSpecification
         this.uri = uri
-        this.size = size
+        this.plotSize = plotSize
         this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(Base58.fromBase58String(publicKeyBase58))
         this.publicKeyBase58 = publicKeyBase58
         this.creationTimeUTC = Instant.now().toEpochMilli() // UTC time
 
-        if (size < 1)
+        if (plotSize < 1)
             throw IllegalArgumentException("The plot size must be a strictly positive number")
     }
 
@@ -152,7 +155,7 @@ class Miner: Comparable<Miner>, Parcelable {
         )
 
         this.uri = parcel.readSerializable() as URI
-        this.size = parcel.readLong()
+        this.plotSize = parcel.readLong()
 
         var publicKeyForSigningDeadlinesBytes = ByteArray(parcel.readInt())
         parcel.readByteArray(publicKeyForSigningDeadlinesBytes)
@@ -166,7 +169,7 @@ class Miner: Comparable<Miner>, Parcelable {
         var uuid: UUID? = null
         var miningSpecification: MiningSpecification? = null
         var uri: URI? = null
-        var size: Long? = null
+        var plotSize: Long? = null
         var publicKeyBase58: String? = null
         var creationTimeUTC: Long? = null
 
@@ -178,7 +181,7 @@ class Miner: Comparable<Miner>, Parcelable {
                 UUID_TAG -> uuid = readUUID(parser)
                 MINING_SPECIFICATION_TAG -> miningSpecification = readMiningSpecification(parser)
                 URI_TAG -> uri = readURI(parser)
-                SIZE_TAG -> size = readSize(parser)
+                PLOT_SIZE_TAG -> plotSize = readPlotSize(parser)
                 PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG -> publicKeyBase58 = readText(parser)
                 CREATION_TIME_UTC_TAG -> creationTimeUTC = readLong(parser)
                 else -> skip(parser)
@@ -190,7 +193,7 @@ class Miner: Comparable<Miner>, Parcelable {
         this.uuid = uuid ?: throw XmlPullParserException("Missing $UUID_TAG in miner")
         this.miningSpecification = miningSpecification ?: throw XmlPullParserException("Missing $MINING_SPECIFICATION_TAG in miner")
         this.uri = uri ?: throw XmlPullParserException("Missing $URI_TAG in miner")
-        this.size = size ?: throw XmlPullParserException("The $SIZE_TAG size must be provided and be positive")
+        this.plotSize = plotSize ?: throw XmlPullParserException("The $PLOT_SIZE_TAG tag must be provided and be positive")
         this.publicKeyBase58 = Base58.requireBase58(publicKeyBase58, ::XmlPullParserException)
         try {
             this.publicKey = miningSpecification.signatureForDeadlines.publicKeyFromEncoding(
@@ -237,9 +240,9 @@ class Miner: Comparable<Miner>, Parcelable {
         serializer.text(uri.toString())
         serializer.endTag(null, URI_TAG)
 
-        serializer.startTag(null, SIZE_TAG)
-        serializer.text(size.toString())
-        serializer.endTag(null, SIZE_TAG)
+        serializer.startTag(null, PLOT_SIZE_TAG)
+        serializer.text(plotSize.toString())
+        serializer.endTag(null, PLOT_SIZE_TAG)
 
         serializer.startTag(null, PUBLIC_KEY_FOR_SIGNING_DEADLINES_BASE58_TAG)
         serializer.text(publicKeyBase58)
@@ -280,7 +283,7 @@ class Miner: Comparable<Miner>, Parcelable {
         out.writeString(miningSpecification.signatureForDeadlines.name)
         out.writeString(miningSpecification.publicKeyForSigningBlocksBase58)
         out.writeSerializable(uri)
-        out.writeLong(size)
+        out.writeLong(plotSize)
         val publicKeyBytes = miningSpecification.signatureForDeadlines.encodingOf(publicKey)
         out.writeInt(publicKeyBytes.size)
         out.writeByteArray(publicKeyBytes)
@@ -312,6 +315,23 @@ class Miner: Comparable<Miner>, Parcelable {
 
     override fun toString(): String {
         return "${miningSpecification.name} ($uuid)"
+    }
+
+    /**
+     * Yields an XML representation of this miner.
+     *
+     * @return the XML representation
+     */
+    fun toXML(): String {
+        ByteArrayOutputStream().use {
+            val serializer = Xml.newSerializer()
+            serializer.setOutput(it, "UTF-8")
+            serializer.startDocument(null, true)
+            serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true)
+            writeWith(serializer, MINER_TAG)
+            serializer.endDocument()
+            return it.toString("UTF-8")
+        }
     }
 
     private fun readMiningSpecification(parser: XmlPullParser): MiningSpecification {
@@ -382,7 +402,7 @@ class Miner: Comparable<Miner>, Parcelable {
         }
     }
 
-    private fun readSize(parser: XmlPullParser): Long {
+    private fun readPlotSize(parser: XmlPullParser): Long {
         val size = readText(parser)
 
         try {

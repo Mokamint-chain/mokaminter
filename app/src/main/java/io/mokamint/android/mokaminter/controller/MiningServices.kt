@@ -85,7 +85,7 @@ class MiningServices(private val mvc: MVC) {
                 miner.miningSpecification.name
             )
 
-            val description = mvc.getString(R.string.notification_tap_to_show_miners)
+            val description = mvc.getString(R.string.notification_tap_to_show)
 
             return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
                 .setContentTitle(title)
@@ -117,8 +117,10 @@ class MiningServices(private val mvc: MVC) {
                 /**
                  * A counter of the deadlines computed with this service, used
                  * to decide when to reload the balance of the corresponding miner.
+                 * We start it at 20 in order to avoid generating many requests to the server
+                 * if the user play with turning off and on a miner repeatedly.
                  */
-                private var deadlines: Int = 0
+                private var deadlines = 20
 
                 override fun onConnected() {
                     super.onConnected()

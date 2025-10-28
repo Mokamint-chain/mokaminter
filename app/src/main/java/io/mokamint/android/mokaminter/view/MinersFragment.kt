@@ -17,9 +17,11 @@ limitations under the License.
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -215,8 +217,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private fun totalNonces(miner: Miner): String {
             return resources.getQuantityString(R.plurals.nonces,
                 // the quantity selector must be an Int but we have a Long here...
-                if (miner.size > 1000L) 1000 else miner.size.toInt(),
-                miner.size)
+                if (miner.plotSize > 1000L) 1000 else miner.plotSize.toInt(),
+                miner.plotSize)
         }
 
         private inner class ViewHolder(val binding: MinerCardBinding): RecyclerView.ViewHolder(binding.root) {
@@ -237,7 +239,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                         binding.plotSize.text = getString(R.string.miner_card_plot_size, totalNonces(miner))
                     else {
                         val percent = progress[miner] ?: 0
-                        val noncesProcessed = miner.size * percent / 100
+                        val noncesProcessed = miner.plotSize * percent / 100
                         binding.plotSize.text = getString(
                             R.string.miner_card_plot_size_in_progress,
                             noncesProcessed,
@@ -305,16 +307,20 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
 
             private fun clickListenerForMiner(item: MenuItem, miner: Miner): Boolean {
                 return when (item.itemId) {
-                    R.id.action_delete_miner -> {
-                        DeleteMinerConfirmationDialogFragment.show(this@MinersFragment, miner)
-                        true
-                    }
                     R.id.action_turn_off_miner -> {
                         getController().onTurnOffRequested(miner)
                         true
                     }
                     R.id.action_turn_on_miner -> {
                         getController().onTurnOnRequested(miner)
+                        true
+                    }
+                    R.id.action_share_miner -> {
+                        getController().onShareRequested(miner, context)
+                        true
+                    }
+                    R.id.action_delete_miner -> {
+                        DeleteMinerConfirmationDialogFragment.show(this@MinersFragment, miner)
                         true
                     }
                     else -> false

@@ -55,7 +55,7 @@ class CreatePlotConfirmationDialogFragment: AbstractDialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val totalSize = PlotSizes.of(
-            miner.getProlog(), miner.size, miner.miningSpecification.hashingForDeadlines
+            miner.getProlog(), miner.plotSize, miner.miningSpecification.hashingForDeadlines
         ).totalSize
 
         return AlertDialog.Builder(context)
@@ -64,7 +64,7 @@ class CreatePlotConfirmationDialogFragment: AbstractDialogFragment() {
             .setMessage(getString(
                     R.string.create_plot_confirmation_message,
                     miner.miningSpecification.name,
-                    miner.size,
+                    miner.plotSize,
                     totalSize / 1_000_000_000.0 // we express the size in gigabytes
                 ))
             .setNegativeButton(R.string.dismiss) { _, _ -> }

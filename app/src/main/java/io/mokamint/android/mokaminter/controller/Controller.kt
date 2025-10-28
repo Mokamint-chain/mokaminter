@@ -19,6 +19,7 @@ package io.mokamint.android.mokaminter.controller
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
 import android.os.Build
 import android.util.Log
@@ -179,6 +180,18 @@ class Controller(private val mvc: MVC) {
                 mvc.view?.onTurnedOff(miner)
             }
         }
+    }
+
+    @UiThread
+    fun onShareRequested(miner: Miner, context: Context) {
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, miner.toXML())
+            type = "text/plain"
+        }
+
+        val shareIntent = Intent.createChooser(sendIntent, null)
+        context.startActivity(shareIntent)
     }
 
     private fun createNotification(title: String, description: String): Notification {
@@ -386,7 +399,7 @@ class Controller(private val mvc: MVC) {
 
             try {
                 Plots.create(
-                    path, miner.getProlog(), 0, miner.size,
+                    path, miner.getProlog(), 0, miner.plotSize,
                     miner.miningSpecification.hashingForDeadlines
                 ) { percent ->
                     controller.mainScope.launch { mvc.view?.onPlotCreationTick(miner, percent) }

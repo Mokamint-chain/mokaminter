@@ -90,7 +90,7 @@ class MiningServices(private val mvc: MVC) {
             return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
                 .setContentTitle(title)
                 .setContentText(description)
-                .setSmallIcon(R.drawable.ic_active_miner)
+                .setSmallIcon(R.drawable.ic_miner)
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setPriority(NotificationManager.IMPORTANCE_DEFAULT)

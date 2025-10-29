@@ -291,113 +291,86 @@ class Controller(private val mvc: MVC) {
     }
 
     /**
-     * Shared implementation of WorkManager works for this controller.
-     */
-    abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
-
-        override suspend fun doWork(): Result {
-            val mvc = applicationContext as MVC
-
-            try {
-                return doWork(mvc)
-            }
-            catch (_: TimeoutException) {
-                Log.w(TAG, "A background work timed-out")
-                return Result.failure()
-            } catch (_: CancellationException) {
-                return Result.success()
-            } catch (t: Throwable) {
-                Log.w(TAG, "A background work failed", t)
-                return Result.failure()
-            }
-        }
-
-        protected suspend fun publishForegroundNotification(notification: Notification, id: Int) {
-            val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
-                ForegroundInfo(id, notification)
-            else
-                // more recent Android versions require a finer-grained specification
-                // of the foreground service
-                ForegroundInfo(id, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-
-            setForeground(foregroundInfo)
-        }
-
-        protected abstract suspend fun doWork(mvc: MVC): Result
-    }
-
-    /**
      * A background work for the creation of the plot of a miner.
      */
-    class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
+    class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
         companion object {
             const val MINER_UUID = "miner_uuid"
             private val nextId = AtomicInteger(100)
         }
 
-        override suspend fun doWork(mvc: MVC): Result {
-            val controller = mvc.controller
-            val uuid = UUID.fromString(inputData.getString(MINER_UUID))
-            val miner = mvc.model.miners.get(uuid)
-            if (miner == null) {
-                Log.w(
-                    TAG,
-                    "The miner with uuid $uuid has been deleted before the creation of its plot!"
-                )
-                return Result.failure()
-            }
-
-            val id = nextId.getAndIncrement()
-            val notification = createNotification(miner, 0, mvc)
-            publishForegroundNotification(notification, id)
-
-            val filename = "$uuid.plot"
-            val path = mvc.filesDir.toPath().resolve(filename)
-
-            Log.i(TAG, "Started creation of $path for miner $miner")
+        override suspend fun doWork(): Result {
+            val mvc = applicationContext as MVC
 
             try {
-                Plots.create(
-                    path, miner.getProlog(), 0, miner.plotSize,
-                    miner.miningSpecification.hashingForDeadlines
-                ) { percent ->
-                    val notification = createNotification(miner, percent, mvc)
-                    controller.mainScope.launch {
-                        mvc.view?.onPlotCreationTick(miner, percent)
-                        publishForegroundNotification(notification, id)
-                    }
-                    Log.i(TAG, "Created $percent% of plot $path")
+                val controller = mvc.controller
+                val uuid = UUID.fromString(inputData.getString(MINER_UUID))
+                val miner = mvc.model.miners.get(uuid)
+                if (miner == null) {
+                    Log.w(
+                        TAG,
+                        "The miner with uuid $uuid has been deleted before the creation of its plot!"
+                    )
+                    return Result.failure()
                 }
-            } catch (_: FileNotFoundException) {
-                // the miner has been deleted before the complete creation of its plot
-                Log.w(
-                    TAG,
-                    "Miner $miner has been deleted before the full creation of its plot!"
-                )
+
+                val id = nextId.getAndIncrement()
+                val notification = createNotification(miner, 0, mvc)
+                publishForegroundNotification(notification, id)
+
+                val filename = "$uuid.plot"
+                val path = mvc.filesDir.toPath().resolve(filename)
+
+                Log.i(TAG, "Started creation of $path for miner $miner")
+
+                try {
+                    Plots.create(
+                        path, miner.getProlog(), 0, miner.plotSize,
+                        miner.miningSpecification.hashingForDeadlines
+                    ) { percent ->
+                        val notification = createNotification(miner, percent, mvc)
+                        controller.mainScope.launch {
+                            mvc.view?.onPlotCreationTick(miner, percent)
+                            publishForegroundNotification(notification, id)
+                        }
+                        Log.i(TAG, "Created $percent% of plot $path")
+                    }
+                } catch (_: FileNotFoundException) {
+                    // the miner has been deleted before the complete creation of its plot
+                    Log.w(
+                        TAG,
+                        "Miner $miner has been deleted before the full creation of its plot!"
+                    )
+                    return Result.failure()
+                }
+
+                Log.i(TAG, "Completed creation of $path for miner $miner")
+
+                if (mvc.model.miners.markHasPlot(miner)) {
+                    controller.mainScope.launch {
+                        controller.miningServices.ensureServiceFor(miner)
+                        mvc.view?.onPlotCreationCompleted(miner)
+                    }
+                } else controller.deletePlotOf(miner)
+
+                return Result.success()
+            } catch (_: CancellationException) {
+                Log.w(TAG, "Plot creation cancelled")
+                return Result.success()
+            } catch (t: Throwable) {
+                Log.w(TAG, "Plot creation failed", t)
                 return Result.failure()
             }
-
-            Log.i(TAG, "Completed creation of $path for miner $miner")
-
-            if (mvc.model.miners.markHasPlot(miner)) {
-                controller.mainScope.launch {
-                    controller.miningServices.ensureServiceFor(miner)
-                    mvc.view?.onPlotCreationCompleted(miner)
-                }
-            } else controller.deletePlotOf(miner)
-
-            return Result.success()
         }
 
         private fun createNotification(miner: Miner, percent: Int, mvc: MVC): Notification {
             val title = mvc.getString(
                 R.string.notification_plot_creation_title,
                 miner.miningSpecification.name,
-                percent
             )
 
-            val description = mvc.getString(R.string.notification_tap_to_show)
+            val description = mvc.getString(R.string.notification_tap_to_show_with_progress, percent)
 
             val showActivityIntent = Intent(mvc, Mokaminter::class.java)
             val showActivityPendingIntent = TaskStackBuilder.create(mvc).run {
@@ -408,12 +381,23 @@ class Controller(private val mvc: MVC) {
             return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
                 .setContentTitle(title)
                 .setContentText(description)
-                .setSmallIcon(R.drawable.ic_active_miner)
+                .setSmallIcon(R.drawable.ic_plot_file)
                 .setOngoing(false)
                 .setAutoCancel(false)
                 .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
                 .setContentIntent(showActivityPendingIntent)
                 .build()
+        }
+
+        private suspend fun publishForegroundNotification(notification: Notification, id: Int) {
+            val foregroundInfo = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+                ForegroundInfo(id, notification)
+            else
+            // more recent Android versions require a finer-grained specification
+            // of the foreground service
+                ForegroundInfo(id, notification, FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+
+            setForeground(foregroundInfo)
         }
     }
 

@@ -85,8 +85,9 @@ class MiningServices(private val mvc: MVC) {
 
         private fun createActiveMiningNotification(miner: Miner, mvc: MVC): Notification {
             val stopMiningIntent = StopMiningReceiver.createIntent(miner, mvc)
+            val id = "mining".hashCode() xor miner.uuid.hashCode()
             val stopMiningPendingIntent = PendingIntent.getBroadcast(
-                mvc, miner.uuid.hashCode(), stopMiningIntent,
+                mvc, id, stopMiningIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
@@ -277,7 +278,8 @@ class MiningServices(private val mvc: MVC) {
 
             val service = createService(miner, mvc)
             val notification = createActiveMiningNotification(miner, mvc)
-            publishForegroundNotification(notification, uuid.hashCode())
+            val id = "mining".hashCode() xor uuid.hashCode()
+            publishForegroundNotification(notification, id)
             service.waitUntilClosed()
 
             return Result.success()
@@ -346,10 +348,8 @@ class MiningServices(private val mvc: MVC) {
 
             val service = createService(miner, mvc)
             val notification = createActiveMiningNotification(miner, mvc)
-
-            setNotification(
-                params, uuid.hashCode(), notification, JOB_END_NOTIFICATION_POLICY_REMOVE
-            )
+            val id = "mining".hashCode() xor uuid.hashCode()
+            setNotification(params, id, notification, JOB_END_NOTIFICATION_POLICY_REMOVE)
 
             ioScope.launch {
                 service.waitUntilClosed()

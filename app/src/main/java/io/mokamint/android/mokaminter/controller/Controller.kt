@@ -365,7 +365,7 @@ class Controller(private val mvc: MVC) {
 
                 // we are creating a plot for a miner, therefore there is no notification with
                 // the same id, since the miner cannot have a mining notification already
-                val id = uuid.hashCode()
+                val id = "plot creation".hashCode() xor uuid.hashCode()
                 val notification = createNotification(miner, 0, mvc)
                 publishForegroundNotification(notification, id)
 

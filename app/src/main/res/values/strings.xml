@@ -62,7 +62,7 @@
     <string name="miner_card_last_updated">last updated: %1$s</string>
     <string name="notification_mining_activity">Mining activity</string>
     <string name="notification_tap_to_show">Tap to show</string>
-    <string name="notification_tap_to_show_with_progress">Tap to show (%1$d)</string>
+    <string name="notification_tap_to_show_with_progress">Tap to show (%1$d%%)</string>
     <string name="notification_pause_mining">Pause mining</string>
     <string name="menu_settings">Settings</string>
     <string name="source_code_uri">Source code: https://github.com/Mokamint-chain/mokaminter</string>

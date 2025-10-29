@@ -20,7 +20,6 @@ import android.annotation.SuppressLint
 import android.content.res.ColorStateList
 import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -90,7 +89,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_reload_balances -> {
-                getController().onBalancesReloadRequested()
+                getController().onUpdateOfAllBalancesRequested()
                 true
             }
             R.id.action_add_miner -> {

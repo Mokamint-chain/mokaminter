@@ -137,18 +137,21 @@ class Controller(private val mvc: MVC) {
     }
 
     @UiThread
-    fun onBalancesReloadRequested() {
-        mainScope.launch {
-            val snapshot = ioScope.async { mvc.model.miners.reload() }.await()
+    fun onUpdateOfAllBalancesRequested() {
+        safeRunAsIO {
+            val snapshot = mvc.model.miners.reload()
             snapshot.forEach { miner, status ->
                 if (status.isOn && status.hasPlotReady)
-                    ioScope.launch { fetchBalanceOf(miner) }
+                    miningServices.fetchBalanceOf(miner)
             }
         }
     }
 
-    fun fetchBalanceOf(miner: Miner) {
-        miningServices.fetchBalanceOf(miner)
+    @UiThread
+    fun onUpdateOfBalanceRequested(miner: Miner) {
+        safeRunAsIO(false) {
+            miningServices.fetchBalanceOf(miner)
+        }
     }
 
     @UiThread

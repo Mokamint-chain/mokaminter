@@ -138,7 +138,7 @@ class MiningServices(private val mvc: MVC) {
                     mainScope.launch {
                         mvc.view?.onDeadlineComputed(miner)
                         if (deadlines++ % DEADLINES_FOR_BALANCE_FETCH == 0)
-                            ioScope.launch { mvc.controller.fetchBalanceOf(miner) }
+                            mvc.controller.onUpdateOfBalanceRequested(miner)
                     }
                 }
             }
@@ -174,22 +174,16 @@ class MiningServices(private val mvc: MVC) {
     fun fetchBalanceOf(miner: Miner) {
         services[miner.uuid]?.let { service ->
             if (service.isConnected) {
-                try {
-                    val balance = service.getBalance(
-                        miner.miningSpecification.signatureForDeadlines,
-                        miner.publicKey
-                    )
+                val balance = service.getBalance(
+                    miner.miningSpecification.signatureForDeadlines,
+                    miner.publicKey
+                )
 
-                    balance?.let { it ->
-                        Log.d(TAG, "Fetched balance $it of $miner")
-                        val done = mvc.model.miners.setBalance(miner, it.orElse(BigInteger.ZERO))
-                        if (done)
-                            mainScope.launch { mvc.view?.onBalanceChanged(miner) }
-                    }
-                } catch (e: ClosedMinerException) {
-                    Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
-                } catch (e: TimeoutException) {
-                    Log.w(TAG, "Failed to fetch the balance of $miner: ${e.message}")
+                balance?.let { it ->
+                    Log.d(TAG, "Fetched balance $it of $miner")
+                    val done = mvc.model.miners.setBalance(miner, it.orElse(BigInteger.ZERO))
+                    if (done)
+                        mainScope.launch { mvc.view?.onBalanceChanged(miner) }
                 }
             }
         }

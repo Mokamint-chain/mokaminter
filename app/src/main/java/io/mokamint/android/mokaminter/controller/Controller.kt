@@ -42,7 +42,6 @@ import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.model.MinerStatus
 import io.mokamint.android.mokaminter.view.Mokaminter
-import io.mokamint.miner.api.MiningSpecification
 import io.mokamint.miner.service.MinerServices
 import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
@@ -64,29 +63,42 @@ import kotlin.coroutines.cancellation.CancellationException
  * @param mvc the MVC triple
  */
 class Controller(private val mvc: MVC) {
+
+    /**
+     * The object that keeps, starts and stops the mining services for the miners.
+     */
+    val miningServices = MiningServices(mvc)
+
     private val ioScope = CoroutineScope(Dispatchers.IO)
     private val mainScope = CoroutineScope(Dispatchers.Main)
 
     /**
-     * True if and only if the controller is executing a background task for which the
-     * progress bar activity has been requested.
+     * The number of ongoing backgrounds task for which the
+     * progress bar activity of the view has been requested.
      */
-    private val working = AtomicInteger(0)
+    private val ongoingWorks = AtomicInteger(0)
 
-    val miningServices = MiningServices(mvc)
-
+    /**
+     * A thread that redraws the miners periodically. This only exists if the view
+     * requires such machinery.
+     */
     private var minersRedrawer: MinersRedrawer? = null
 
     companion object {
         private val TAG = Controller::class.simpleName
 
         /**
-         * The interval, in milliseconds, between successive
-         * updates of the last updated information of the miners.
+         * The interval, in milliseconds, between successive redraws of the miners.
          */
-        private const val MINERS_REDRAW_INTERVAL = 10_000L // ten seconds
+        const val MINERS_REDRAW_INTERVAL = 10_000L // ten seconds
     }
 
+    /**
+     * Determines if this controller is holding a connected mining service for the given miner.
+     *
+     * @param miner the miner
+     * @return true if and only if that condition holds
+     */
     @UiThread
     fun hasConnectedServiceFor(miner: Miner): Boolean {
         return miningServices.hasConnectedServiceFor(miner)
@@ -94,9 +106,13 @@ class Controller(private val mvc: MVC) {
 
     @UiThread
     fun isWorking(): Boolean {
-        return working.get() > 0
+        return ongoingWorks.get() > 0
     }
 
+    /**
+     * Called when the current view lets the miners be visible, so that they
+     * must be updated and their services must be opened, if not already open.
+     */
     @UiThread
     fun onMinersVisible() {
         val minersRedrawer = MinersRedrawer()
@@ -115,27 +131,20 @@ class Controller(private val mvc: MVC) {
         }
     }
 
-    private inner class MinersRedrawer: Thread() {
-        override fun run() {
-            Log.d(TAG, "Starting redrawing the miners periodically")
-
-            try {
-                while (true) {
-                    sleep(MINERS_REDRAW_INTERVAL)
-                    mainScope.launch { mvc.view?.onRedrawMiners() }
-                }
-            }
-            catch (_: InterruptedException) {
-                Log.d(TAG, "Stopping redrawing the miners")
-            }
-        }
-    }
-
+    /**
+     * Called when the current view hides the miners, so that there is no need to keep
+     * their information updated on the screen.
+     */
     @UiThread
     fun onMinersInvisible() {
         minersRedrawer?.interrupt()
     }
 
+    /**
+     * Called when the update of the balances of all miners has been requested.
+     * It will return immediately and successively fetch and update the balances.
+     * It uses a progress bar during such side operation.
+     */
     @UiThread
     fun onUpdateOfAllBalancesRequested() {
         safeRunAsIO {
@@ -147,6 +156,11 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Called when the update of the balance of the given miner has been requested.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun onUpdateOfBalanceRequested(miner: Miner) {
         safeRunAsIO(false) {
@@ -154,6 +168,12 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Called when the deletion of the given miner has been requested, including
+     * that of its plot file.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun onDeleteRequested(miner: Miner) {
         mainScope.launch {
@@ -161,19 +181,16 @@ class Controller(private val mvc: MVC) {
             if (removed) {
                 miningServices.stopServiceFor(miner)
                 mvc.view?.onDeleted(miner)
-                deletePlotOf(miner)
+                ioScope.launch { deletePlotFor(miner) }
             }
         }
     }
 
-    private fun deletePlotOf(miner: Miner) {
-        val filename = "${miner.uuid}.plot"
-        if (mvc.deleteFile(filename))
-            Log.i(TAG, "Deleted $filename")
-        else
-            Log.w(TAG, "Failed deleting $filename")
-    }
-
+    /**
+     * Called when the given miner has been requested to be turned on.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun onTurnOnRequested(miner: Miner) {
         mainScope.launch {
@@ -185,6 +202,11 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Called when the given miner has been requested to be turned off.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun onTurnOffRequested(miner: Miner) {
         mainScope.launch {
@@ -196,6 +218,11 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Called when the information of given miner has been requested to be shared.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun onShareRequested(miner: Miner, context: Context) {
         val sendIntent = Intent().apply {
@@ -209,28 +236,32 @@ class Controller(private val mvc: MVC) {
     }
 
     /**
-     * Requests the creation of a miner.
+     * Called when the creation of a new miner has been requested. It will return the
+     * identifier of the miner immediately and start creating the miner on the background,
+     * from its mining specification fetched from its remote endpoint.
      *
+     * @param uri the remote endpoint of the remote miner for which the new miner will work
+     * @param plotSize the plot size of the new miner
+     * @param entropy the entropy of the key pair of the new miner; if this is present, also
+     *                the password must be present; otherwise, the public key must be present
+     * @param password the password of the entropy of the private key of the new miner
+     * @param publicKeyBase58 the Base58-encoded public key of the new miner; this is only
+     *                        specified if {@code entropy} and {@code password} are not specified
      * @return the identifier of the miner whose creation starts with this call
      */
     @UiThread
-    fun onMinerCreationRequested(uri: URI, size: Long, entropy: Entropy?, password: String?, publicKeyBase58: String?): UUID {
+    fun onMinerCreationRequested(uri: URI, plotSize: Long, entropy: Entropy?, password: String?, publicKeyBase58: String?): UUID {
         val uuid = UUID.randomUUID()
 
         safeRunAsIO {
             try {
-                val miningSpecification: MiningSpecification
-
-                MinerServices.of(uri, 20_000).use {
-                    miningSpecification = it.miningSpecification
-                }
-
+                val miningSpecification = MinerServices.of(uri, 20_000).use { it.miningSpecification }
                 Log.i(TAG, "Fetched the mining specification of $uri:\n$miningSpecification")
 
                 val miner: Miner
                 if (publicKeyBase58 != null) {
                     try {
-                        miner = Miner(uuid, miningSpecification, uri, size, publicKeyBase58)
+                        miner = Miner(uuid, miningSpecification, uri, plotSize, publicKeyBase58)
                         Log.i(TAG, "Ready to create plot file for miner $miner")
                         mainScope.launch { mvc.view?.onReadyToCreatePlotFor(miner) }
                     } catch (_: InvalidKeySpecException) {
@@ -241,7 +272,7 @@ class Controller(private val mvc: MVC) {
                 } else if (entropy != null && password != null) {
                     val signatureForDeadlines = miningSpecification.signatureForDeadlines
                     miner = Miner(
-                        uuid, miningSpecification, uri, size,
+                        uuid, miningSpecification, uri, plotSize,
                         Base58.toBase58String(
                             signatureForDeadlines.encodingOf
                                 (entropy.keys(password, signatureForDeadlines).public)
@@ -260,36 +291,42 @@ class Controller(private val mvc: MVC) {
         return uuid
     }
 
+    /**
+     * Called when the creation of the plot file for the given miner has been requested.
+     * It will return immediately and the creation of the plot file will subsequently
+     * be performed as a side work.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun onPlotCreationRequested(miner: Miner) {
+        mvc.view?.onPlotCreationConfirmed(miner)
+
         mainScope.launch {
-            mvc.view?.onPlotCreationConfirmed(miner)
-
-            val status = MinerStatus(
-                BigInteger.ZERO,
-                hasPlotReady = false,
-                isOn = true,
-                -1L
-            )
-
+            val status = MinerStatus(BigInteger.ZERO, hasPlotReady = false, isOn = true, -1L)
             ioScope.async { mvc.model.miners.add(miner, status) }.await()
-
             mvc.view?.onAdded(miner)
+            PlotCreationWorker.spawn(miner, mvc)
+        }
+    }
 
-            val plotCreationRequest =
-                OneTimeWorkRequestBuilder<PlotCreationWorker>()
-                    .setInputData(
-                        workDataOf(
-                            Pair(
-                                PlotCreationWorker.MINER_UUID,
-                                miner.uuid.toString()
-                            )
-                        )
-                    )
-                    .build()
+    /**
+     * A thread that redraws the miners, periodically, thus updating their last update information.
+     */
+    private inner class MinersRedrawer: Thread() {
 
-            WorkManager.getInstance(mvc)
-                .enqueue(plotCreationRequest)
+        override fun run() {
+            Log.d(TAG, "Starting redrawing the miners periodically")
+
+            try {
+                while (true) {
+                    sleep(MINERS_REDRAW_INTERVAL)
+                    mainScope.launch { mvc.view?.onRedrawMiners() }
+                }
+            }
+            catch (_: InterruptedException) {
+                Log.d(TAG, "Stopping redrawing the miners")
+            }
         }
     }
 
@@ -299,8 +336,16 @@ class Controller(private val mvc: MVC) {
     class PlotCreationWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
         companion object {
-            const val MINER_UUID = "miner_uuid"
-            private val nextId = AtomicInteger(100)
+            private const val MINER_UUID = "miner_uuid"
+
+            fun spawn(miner: Miner, mvc: MVC) {
+                val plotCreationRequest =
+                    OneTimeWorkRequestBuilder<PlotCreationWorker>()
+                        .setInputData(workDataOf(Pair(MINER_UUID, miner.uuid.toString())))
+                        .build()
+
+                WorkManager.getInstance(mvc).enqueue(plotCreationRequest)
+            }
         }
 
         override suspend fun doWork(): Result {
@@ -318,14 +363,16 @@ class Controller(private val mvc: MVC) {
                     return Result.failure()
                 }
 
-                val id = nextId.getAndIncrement()
+                // we are creating a plot for a miner, therefore there is no notification with
+                // the same id, since the miner cannot have a mining notification already
+                val id = uuid.hashCode()
                 val notification = createNotification(miner, 0, mvc)
                 publishForegroundNotification(notification, id)
 
                 val filename = "$uuid.plot"
                 val path = mvc.filesDir.toPath().resolve(filename)
 
-                Log.i(TAG, "Started creation of $path for miner $miner")
+                Log.i(TAG, "Started creating plot $path for miner $miner")
 
                 try {
                     Plots.create(
@@ -348,14 +395,14 @@ class Controller(private val mvc: MVC) {
                     return Result.failure()
                 }
 
-                Log.i(TAG, "Completed creation of $path for miner $miner")
+                Log.i(TAG, "Completed the creation of plot $path for miner $miner")
 
                 if (mvc.model.miners.markHasPlot(miner)) {
                     controller.mainScope.launch {
                         controller.miningServices.ensureServiceFor(miner)
                         mvc.view?.onPlotCreationCompleted(miner)
                     }
-                } else controller.deletePlotOf(miner)
+                } else controller.deletePlotFor(miner)
 
                 return Result.success()
             } catch (_: CancellationException) {
@@ -404,10 +451,19 @@ class Controller(private val mvc: MVC) {
         }
     }
 
+    private fun deletePlotFor(miner: Miner) {
+        val filename = "${miner.uuid}.plot"
+        if (mvc.deleteFile(filename))
+            Log.i(TAG, "Deleted $filename")
+        else
+            Log.w(TAG, "Failed deleting $filename")
+    }
+
+    @UiThread
     private fun safeRunAsIO(showProgressBar: Boolean = true, task: () -> Unit) {
         if (showProgressBar) {
-            working.incrementAndGet()
-            mainScope.launch { mvc.view?.onBackgroundStart() }
+            ongoingWorks.incrementAndGet()
+            mvc.view?.onBackgroundStart()
         }
 
         ioScope.launch {
@@ -422,7 +478,7 @@ class Controller(private val mvc: MVC) {
                 if (showProgressBar)
                     mainScope.launch { mvc.view?.notifyUser(t.toString()) }
             } finally {
-                if (showProgressBar && working.decrementAndGet() == 0)
+                if (showProgressBar && ongoingWorks.decrementAndGet() == 0)
                     mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
         }

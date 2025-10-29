@@ -30,7 +30,6 @@ import io.mokamint.android.mokaminter.MVC
 import io.mokamint.android.mokaminter.R
 import io.mokamint.android.mokaminter.model.Miner
 import io.mokamint.android.mokaminter.view.Mokaminter
-import io.mokamint.miner.api.ClosedMinerException
 import io.mokamint.miner.local.LocalMiners
 import io.mokamint.miner.service.AbstractReconnectingMinerService
 import io.mokamint.miner.service.api.ReconnectingMinerService
@@ -43,7 +42,6 @@ import java.math.BigInteger
 import java.util.Optional
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeoutException
 
 class MiningServices(private val mvc: MVC) {
 
@@ -67,8 +65,7 @@ class MiningServices(private val mvc: MVC) {
         private val mainScope = CoroutineScope(Dispatchers.Main)
 
         private fun createActiveMiningNotification(miner: Miner, mvc: MVC): Notification {
-            val stopMiningIntent = Intent(mvc, StopMiningReceiver::class.java)
-            stopMiningIntent.putExtra(StopMiningReceiver.UUID, miner.uuid.toString())
+            val stopMiningIntent = StopMiningReceiver.createIntent(miner, mvc)
             val stopMiningPendingIntent = PendingIntent.getBroadcast(
                 mvc, miner.uuid.hashCode(), stopMiningIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -84,7 +81,6 @@ class MiningServices(private val mvc: MVC) {
                 R.string.notification_mining_active,
                 miner.miningSpecification.name
             )
-
             val description = mvc.getString(R.string.notification_tap_to_show)
 
             return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
@@ -99,6 +95,13 @@ class MiningServices(private val mvc: MVC) {
                 .build()
         }
 
+        /**
+         * Creates a local miner and a reconnecting mining service that uses the local miner
+         * in order to contribute of the mining activity of a remote miner.
+         *
+         * @param miner the miner for which the operation is performed
+         * @param mvc the MVC triple of the application
+         */
         private fun createService(miner: Miner, mvc: MVC): ReconnectingMinerService {
             val filename = "${miner.uuid}.plot"
             val path = mvc.filesDir.toPath().resolve(filename)
@@ -150,6 +153,12 @@ class MiningServices(private val mvc: MVC) {
         }
     }
 
+    /**
+     * Ensures that a mining service exists for the given miner.
+     *
+     * @param miner the miner
+     */
+    @UiThread
     fun ensureServiceFor(miner: Miner) {
         // older Android versions will use the WorkManager, while newer
         // versions have a quota limit on the WorkManager and therefore will rather
@@ -161,16 +170,34 @@ class MiningServices(private val mvc: MVC) {
             MiningWatcherJobService.ensureServiceFor(miner, mvc)
     }
 
+    /**
+     * Stops the mining service for the given miner.
+     *
+     * @param miner the miner
+     */
     @UiThread
     fun stopServiceFor(miner: Miner) {
         stopServiceFor(miner.uuid)
     }
 
+    /**
+     * Determines if this container contains a mining service for the given miner
+     * and that mining service is currently connected.
+     *
+     * @param miner the miner
+     * @return true if and only if that condition holds
+     */
     @UiThread
     fun hasConnectedServiceFor(miner: Miner): Boolean {
         return services[miner.uuid]?.isConnected == true
     }
 
+    /**
+     * Uses the mining service for the given miner, if it exists in this container,
+     * to fetch the balance of the given miner and update the miner data consequently.
+     *
+     * @param miner the miner
+     */
     fun fetchBalanceOf(miner: Miner) {
         services[miner.uuid]?.let { service ->
             if (service.isConnected) {
@@ -307,13 +334,14 @@ class MiningServices(private val mvc: MVC) {
 
             ioScope.launch {
                 service.waitUntilClosed()
-                jobFinished(params, false)
+                jobFinished(params, false) // terminate the job and do not reschedule
             }
 
-            return true // keep the thread running, the job has not finished yet
+            return true // keep the thread running: the job has not finished yet
         }
 
         @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+        @UiThread
         override fun onStopJob(params: JobParameters): Boolean {
             val mvc = applicationContext as MVC
             val uuid = UUID.fromString(params.extras.getString(MINER_UUID))

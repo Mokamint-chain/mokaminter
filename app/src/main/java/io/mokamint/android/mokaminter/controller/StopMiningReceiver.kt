@@ -20,19 +20,34 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.annotation.UiThread
 import io.mokamint.android.mokaminter.MVC
+import io.mokamint.android.mokaminter.model.Miner
 
 /**
  * A receiver of a request to stop a miner. This is used to stop a miner
- * when clicking on an action button in the foreground notification of the mining activity.
+ * when clicking on an action button in the foreground notification of the miner.
  */
 class StopMiningReceiver: BroadcastReceiver() {
 
     companion object {
-        const val UUID = "uuid"
+        private const val UUID = "uuid"
         private val TAG = StopMiningReceiver::class.simpleName
+
+        /**
+         * Creates an intent that can be used to trigger this receiver and stop a miner.
+         *
+         * @param miner the miner to stop
+         * @param mvc te MVC triple of the application
+         */
+        fun createIntent(miner: Miner, mvc: MVC): Intent {
+            val stopMiningIntent = Intent(mvc, StopMiningReceiver::class.java)
+            stopMiningIntent.putExtra(StopMiningReceiver.UUID, miner.uuid.toString())
+            return stopMiningIntent
+        }
     }
 
+    @UiThread
     override fun onReceive(context: Context, intent: Intent) {
         intent.getStringExtra(UUID)?.let { it ->
             val uuid = java.util.UUID.fromString(it)

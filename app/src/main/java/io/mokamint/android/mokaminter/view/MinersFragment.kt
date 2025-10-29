@@ -17,11 +17,9 @@ limitations under the License.
 package io.mokamint.android.mokaminter.view
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.drawable.AnimationDrawable
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -59,12 +57,16 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setHasOptionsMenu(true)
-        getController().onMinersUpdaterRequested()
     }
 
     override fun onResume() {
-        getController().onMinersReloadRequested()
         super.onResume()
+        getController().onMinersVisible()
+    }
+
+    override fun onPause() {
+        getController().onMinersInvisible()
+        super.onPause()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): android.view.View {
@@ -284,16 +286,20 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
                     return getString(R.string.in_the_future)
                 else if (diff < 1_000L)
                     return getString(R.string.now)
-                else if (diff < 60_000L) {
+                else if (diff < 60_000L) { // one minute
                     val seconds = diff.toInt() / 1_000
                     return resources.getQuantityString(R.plurals.seconds_ago, seconds, seconds)
                 }
-                else if (diff < 3_600_000L) {
+                else if (diff < 3_600_000L) { // one hour
                     val minutes = diff.toInt() / 60_000
                     return resources.getQuantityString(R.plurals.minutes_ago, minutes, minutes)
                 }
+                else if (diff < 86_400_000) { // 24 hours
+                    val hours = diff.toInt() / 3_600_000
+                    return resources.getQuantityString(R.plurals.hours_ago, hours, hours)
+                }
                 else
-                    return getString(R.string.more_than_one_hour_ago)
+                    return getString(R.string.more_than_one_day_ago)
             }
 
             private fun createMenuForMiner(miner: Miner, status: MinerStatus) {

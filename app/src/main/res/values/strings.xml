@@ -87,6 +87,6 @@
     <string name="never">never</string>
     <string name="in_the_future">in the future</string>
     <string name="now">now</string>
-    <string name="more_than_one_hour_ago">more than one hour ago</string>
+    <string name="more_than_one_day_ago">more than one day ago</string>
     <string name="action_share_miner">Share</string>
 </resources>

@@ -175,7 +175,6 @@ class MiningServices(private val mvc: MVC) {
         services[miner.uuid]?.let { service ->
             if (service.isConnected) {
                 try {
-                    Log.d(TAG, "Asking balance of $miner")
                     val balance = service.getBalance(
                         miner.miningSpecification.signatureForDeadlines,
                         miner.publicKey

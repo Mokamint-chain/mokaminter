@@ -26,7 +26,6 @@ import android.util.Log
 import androidx.annotation.UiThread
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -47,7 +46,6 @@ import io.mokamint.plotter.Plots
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import java.math.BigInteger
@@ -75,6 +73,8 @@ class Controller(private val mvc: MVC) {
 
     val miningServices = MiningServices(mvc)
 
+    private var minersRedrawer: MinersRedrawer? = null
+
     companion object {
         private val TAG = Controller::class.simpleName
 
@@ -83,20 +83,6 @@ class Controller(private val mvc: MVC) {
          * updates of the last updated information of the miners.
          */
         private const val MINERS_REDRAW_INTERVAL = 10_000L // ten seconds
-    }
-
-    /**
-     * Called when the updater thread of the miners must be scheduled.
-     */
-    @UiThread
-    fun onMinersUpdaterRequested() {
-        val minersUpdateRequest =
-            OneTimeWorkRequestBuilder<MinersRedrawWorker>()
-                .setInputData(workDataOf(Pair(ControllerWorker.VISIBLE_TO_USER, false)))
-                .build()
-
-        WorkManager.getInstance(mvc)
-            .enqueueUniqueWork("update", ExistingWorkPolicy.REPLACE, minersUpdateRequest)
     }
 
     @UiThread
@@ -110,7 +96,11 @@ class Controller(private val mvc: MVC) {
     }
 
     @UiThread
-    fun onMinersReloadRequested() {
+    fun onMinersVisible() {
+        val minersRedrawer = MinersRedrawer()
+        this.minersRedrawer = minersRedrawer
+        minersRedrawer.start()
+
         mainScope.launch {
             val snapshot = ioScope.async { mvc.model.miners.reload() }.await()
             snapshot.forEach { miner, status ->
@@ -121,6 +111,27 @@ class Controller(private val mvc: MVC) {
             Log.i(TAG, "Reloaded the list of miners")
             mvc.view?.onMinersReloaded()
         }
+    }
+
+    private inner class MinersRedrawer: Thread() {
+        override fun run() {
+            Log.d(TAG, "Starting redrawing the miners periodically")
+
+            try {
+                while (true) {
+                    sleep(MINERS_REDRAW_INTERVAL)
+                    mainScope.launch { mvc.view?.onRedrawMiners() }
+                }
+            }
+            catch (_: InterruptedException) {
+                Log.d(TAG, "Stopping redrawing the miners")
+            }
+        }
+    }
+
+    @UiThread
+    fun onMinersInvisible() {
+        minersRedrawer?.interrupt()
     }
 
     @UiThread
@@ -282,38 +293,20 @@ class Controller(private val mvc: MVC) {
      */
     abstract class ControllerWorker(mvc: Context, workerParams: WorkerParameters): CoroutineWorker(mvc, workerParams) {
 
-        companion object {
-            const val VISIBLE_TO_USER = "visibleToTheUser"
-        }
-
         override suspend fun doWork(): Result {
             val mvc = applicationContext as MVC
-            val controller = mvc.controller
-            val visibleToUser = inputData.getBoolean(VISIBLE_TO_USER, true)
-            if (visibleToUser) {
-                controller.working.incrementAndGet()
-                controller.mainScope.launch { mvc.view?.onBackgroundStart() }
-            }
 
             try {
                 return doWork(mvc)
             }
             catch (_: TimeoutException) {
                 Log.w(TAG, "A background work timed-out")
-                if (visibleToUser)
-                    controller.mainScope.launch { mvc.view?.notifyUser(mvc.getString(R.string.operation_timeout)) }
                 return Result.failure()
             } catch (_: CancellationException) {
                 return Result.success()
             } catch (t: Throwable) {
                 Log.w(TAG, "A background work failed", t)
-                if (visibleToUser)
-                    controller.mainScope.launch { mvc.view?.notifyUser(t.toString()) }
                 return Result.failure()
-            }
-            finally {
-                if (visibleToUser && controller.working.decrementAndGet() == 0)
-                    controller.mainScope.launch { mvc.view?.onBackgroundEnd() }
             }
         }
 
@@ -329,21 +322,6 @@ class Controller(private val mvc: MVC) {
         }
 
         protected abstract suspend fun doWork(mvc: MVC): Result
-    }
-
-    /**
-     * This background work redraws the current view periodically,
-     * in order, for instance, to keep the last update field updated in real time.
-     * Note that this work has only graphical relevance and is consequently not
-     * a foreground worker, that would survive also when the activity gets destroyed.
-     */
-    class MinersRedrawWorker(mvc: Context, workerParams: WorkerParameters): ControllerWorker(mvc, workerParams) {
-        override suspend fun doWork(mvc: MVC): Result {
-            while (true) {
-                delay(MINERS_REDRAW_INTERVAL)
-                mvc.controller.mainScope.launch { mvc.view?.onRedrawMiners() }
-            }
-        }
     }
 
     /**

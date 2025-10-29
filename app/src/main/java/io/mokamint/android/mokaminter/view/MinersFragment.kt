@@ -65,8 +65,8 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     override fun onPause() {
-        getController().onMinersInvisible()
         super.onPause()
+        getController().onMinersInvisible()
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): android.view.View {
@@ -153,6 +153,11 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     }
 
     private inner class RecyclerAdapter: RecyclerView.Adapter<RecyclerAdapter.ViewHolder>() {
+
+        /**
+         * The miners currently shown on screen. This is a snapshot of the miners currently present
+         * in the model of the application.
+         */
         private var snapshot = MinersSnapshot.empty()
 
         /**
@@ -268,15 +273,15 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             }
 
             /**
-             * Yields a man readable representation of the last updated information in the
-             * given miner status information, in the form, for instance, of seconds or minutes ago.
+             * Yields a man-readable representation of the last updated information in the
+             * given miner status information, in the form, for instance, of the number
+             * of seconds or minutes ago.
              *
              * @param status the miner status information
-             * @return the man readable representation of the last updated information
+             * @return the man-readable representation of the last updated information
              */
             fun lastUpdatedMessage(status: MinerStatus): String {
                 val lastUpdated = status.lastUpdated
-
                 if (lastUpdated < 0)
                     return context.getString(R.string.never)
 
@@ -305,6 +310,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             private fun createMenuForMiner(miner: Miner, status: MinerStatus) {
                 val popup = PopupMenu(context, binding.menuButton)
                 popup.menuInflater.inflate(R.menu.miner_actions, popup.menu)
+                // turn on and turn off are enabled only if the miner is off or on, respectively
                 popup.menu[0].isEnabled = status.hasPlotReady && !status.isOn
                 popup.menu[1].isEnabled = status.isOn
                 popup.setOnMenuItemClickListener{ item -> clickListenerForMiner(item, miner) }

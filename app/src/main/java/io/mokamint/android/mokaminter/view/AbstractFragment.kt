@@ -36,7 +36,8 @@ import io.mokamint.android.mokaminter.model.Model
 abstract class AbstractFragment<V: ViewBinding> : Fragment(), View {
     private var _binding: V? = null
     private var progressBar: ProgressBar? = null
-    protected val binding get() = _binding!!
+    protected val binding
+        get() = _binding!!
 
     @UiThread protected fun setBinding(binding: V) {
         _binding = binding

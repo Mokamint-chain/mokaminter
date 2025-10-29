@@ -20,7 +20,7 @@ import androidx.annotation.UiThread
 import io.mokamint.android.mokaminter.model.Miner
 
 /**
- * A biew of the MVC triple.
+ * A view of the MVC triple.
  */
 interface View {
 

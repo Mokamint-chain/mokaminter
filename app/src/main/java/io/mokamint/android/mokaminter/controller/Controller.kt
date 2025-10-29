@@ -18,6 +18,8 @@ package io.mokamint.android.mokaminter.controller
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.TaskStackBuilder
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
@@ -391,11 +393,17 @@ class Controller(private val mvc: MVC) {
         private fun createNotification(miner: Miner, percent: Int, mvc: MVC): Notification {
             val title = mvc.getString(
                 R.string.notification_plot_creation_title,
-                miner.miningSpecification.name
+                miner.miningSpecification.name,
+                percent
             )
 
-            val description =
-                mvc.getString(R.string.notification_plot_creation_in_progress, percent)
+            val description = mvc.getString(R.string.notification_tap_to_show)
+
+            val showActivityIntent = Intent(mvc, Mokaminter::class.java)
+            val showActivityPendingIntent = TaskStackBuilder.create(mvc).run {
+                addNextIntentWithParentStack(showActivityIntent)
+                getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            }
 
             return NotificationCompat.Builder(mvc, Mokaminter.NOTIFICATION_CHANNEL)
                 .setContentTitle(title)
@@ -404,6 +412,7 @@ class Controller(private val mvc: MVC) {
                 .setOngoing(false)
                 .setAutoCancel(false)
                 .setPriority(NotificationManager.IMPORTANCE_DEFAULT)
+                .setContentIntent(showActivityPendingIntent)
                 .build()
         }
     }

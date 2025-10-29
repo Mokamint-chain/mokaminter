@@ -17,6 +17,7 @@ limitations under the License.
 package io.mokamint.android.mokaminter.view
 
 import android.app.Activity
+import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.ProgressBar
 import android.widget.Toast
@@ -46,15 +47,22 @@ abstract class AbstractFragment<V: ViewBinding> : Fragment(), View {
 
     @UiThread override fun onStart() {
         super.onStart()
-        // we are the view
-        context.applicationContext.view = this
         setSubtitle("")
     }
 
+    override fun onResume() {
+        super.onResume()
+        // we are the view
+        context.applicationContext.view = this
+    }
+
     @UiThread override fun onStop() {
-        // there is no view anymore
-        context.applicationContext.view = null
         closeKeyboard()
+        // we check that we are the currently visible view
+        if (context.applicationContext.view == this)
+            // there is no view anymore
+            context.applicationContext.view = null
+
         super.onStop()
     }
 

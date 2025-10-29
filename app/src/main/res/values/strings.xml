@@ -80,8 +80,7 @@
     <string name="menu_miners">Miners</string>
     <string name="action_turn_on_miner">Turn on</string>
     <string name="action_turn_off_miner">Turn off</string>
-    <string name="notification_plot_creation_title">Plot creation for blockchain %1$s</string>
-    <string name="notification_plot_creation_in_progress">In progress (%1$d%%)</string>
+    <string name="notification_plot_creation_title">Plot creation for blockchain %1$s (%2$d%%)</string>
     <string name="notification_mining_active">Mining for blockchain %1$s</string>
     <string name="cannot_contact">Cannot contact %1$s</string>
     <string name="never">never</string>

@@ -167,7 +167,7 @@ class MiningServices(private val mvc: MVC) {
             }
 
             mvc.controller.miningServices.services[miner.uuid] = service
-            Log.i(TAG, "Started mining service for miner $miner.uuid")
+            Log.i(TAG, "Started mining service for miner $miner")
 
             return service
         }
@@ -185,9 +185,9 @@ class MiningServices(private val mvc: MVC) {
         // use the JobScheduler; which, however, is not available in previous versions,
         // so that both possibilities must be taken into account...
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-            MiningWatcherWorker.ensureServiceFor(miner, mvc)
+            MiningWatcherWorker.scheduleTask(miner, mvc)
         else
-            MiningWatcherJobService.ensureServiceFor(miner, mvc)
+            MiningWatcherJobService.scheduleTask(miner, mvc)
     }
 
     /**
@@ -252,7 +252,7 @@ class MiningServices(private val mvc: MVC) {
         CoroutineWorker(mvc, workerParams) {
 
             companion object {
-                internal fun ensureServiceFor(miner: Miner, mvc: MVC) {
+                internal fun scheduleTask(miner: Miner, mvc: MVC) {
                     val workManager = WorkManager.getInstance(mvc)
                     val id = miner.uuid.toString()
                     val serviceWatcherRequest = OneTimeWorkRequestBuilder<MiningWatcherWorker>()
@@ -307,7 +307,7 @@ class MiningServices(private val mvc: MVC) {
 
             @UiThread
             @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-            internal fun ensureServiceFor(miner: Miner, mvc: MVC) {
+            internal fun scheduleTask(miner: Miner, mvc: MVC) {
                 val uuid = miner.uuid
                 val id = uuid.hashCode()
                 val jobScheduler = mvc.getSystemService(JOB_SCHEDULER_SERVICE) as JobScheduler
@@ -320,6 +320,7 @@ class MiningServices(private val mvc: MVC) {
                     val jobInfo =
                         JobInfo.Builder(id, ComponentName(mvc, MiningWatcherJobService::class.java))
                             .setUserInitiated(true)
+                            .setPersisted(true)
                             .setPriority(JobInfo.PRIORITY_MAX)
                             .setRequiredNetwork(networkRequest)
                             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
@@ -330,6 +331,8 @@ class MiningServices(private val mvc: MVC) {
                     val result = jobScheduler.schedule(jobInfo)
                     if (result != JobScheduler.RESULT_SUCCESS)
                         Log.w(TAG, "Could not schedule job: $result")
+
+                    Log.d(TAG, "Scheduled job #$id for $uuid")
                 }
             }
         }
@@ -339,6 +342,7 @@ class MiningServices(private val mvc: MVC) {
         override fun onStartJob(params: JobParameters): Boolean {
             val mvc = applicationContext as MVC
             val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
+            Log.d(TAG, "onStartJob() for $uuid")
             val miner = mvc.model.miners.get(uuid)
             if (miner == null) {
                 Log.w(TAG, "The miner with uuid $uuid cannot be found!")
@@ -364,6 +368,7 @@ class MiningServices(private val mvc: MVC) {
         override fun onStopJob(params: JobParameters): Boolean {
             val mvc = applicationContext as MVC
             val uuid = UUID.fromString(params.extras.getString(MINER_UUID))
+            Log.d(TAG, "onStopJob() for $uuid")
             mvc.controller.miningServices.stopServiceFor(uuid)
             Log.d(TAG, "The system stopped the mining watcher job for miner $uuid with reason: ${params.stopReason}")
             return true // reschedule the job as soon as possible

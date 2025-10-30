@@ -62,6 +62,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
     override fun onResume() {
         super.onResume()
         getController().onMinersVisible()
+        adapter.update()
     }
 
     override fun onPause() {
@@ -98,10 +99,6 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
             }
             else -> super.onOptionsItemSelected(item)
         }
-    }
-
-    @UiThread override fun onMinersReloaded() {
-        adapter.update()
     }
 
     @UiThread override fun onRedrawMiners() {
@@ -166,6 +163,7 @@ class MinersFragment : AbstractFragment<FragmentMinersBinding>() {
         private val progress = HashMap<Miner, Int>()
 
         @SuppressLint("NotifyDataSetChanged")
+        @UiThread
         fun update() {
             snapshot = getModel().miners.snapshot()
 

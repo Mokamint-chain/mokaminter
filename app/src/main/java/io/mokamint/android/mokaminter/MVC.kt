@@ -17,6 +17,7 @@ limitations under the License.
 package io.mokamint.android.mokaminter
 
 import android.app.Application
+import android.util.Log
 import io.mokamint.android.mokaminter.controller.Controller
 import io.mokamint.android.mokaminter.model.Model
 import io.mokamint.android.mokaminter.view.View
@@ -43,5 +44,11 @@ class MVC: Application() {
             // https://stackoverflow.com/questions/2584401/how-to-add-bouncy-castle-algorithm-to-android
             // answer by satur9nine
         }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        // we have everything in place, now, for accessing the file system and loading the miners
+        controller.onApplicationCreated()
     }
 }

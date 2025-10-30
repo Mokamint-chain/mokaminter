@@ -47,11 +47,6 @@ interface View {
     @UiThread fun onBackgroundEnd() {}
 
     /**
-     * Called when the set of miners has been reloaded.
-     */
-    @UiThread fun onMinersReloaded() {}
-
-    /**
      * Called when a miner has been deleted.
      *
      * @param deleted the deleted miner

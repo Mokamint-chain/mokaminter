@@ -118,17 +118,22 @@ class Controller(private val mvc: MVC) {
         val minersRedrawer = MinersRedrawer()
         this.minersRedrawer = minersRedrawer
         minersRedrawer.start()
+    }
 
-        mainScope.launch {
-            val snapshot = ioScope.async { mvc.model.miners.reload() }.await()
-            snapshot.forEach { miner, status ->
-                if (status.isOn && status.hasPlotReady)
-                    miningServices.ensureServiceFor(miner)
-            }
-
-            Log.i(TAG, "Reloaded the list of miners")
-            mvc.view?.onMinersReloaded()
+    /**
+     * Called when the application starts, in order to load the model from disk and start
+     * all services.
+     */
+    @UiThread
+    fun onApplicationCreated() {
+        val snapshot = mvc.model.miners.reload()
+        snapshot.forEach { miner, status ->
+            if (status.isOn && status.hasPlotReady)
+                miningServices.ensureServiceFor(miner)
         }
+
+        Log.i(TAG, "Reloaded the list of miners from disk")
+        mvc.view?.onRedrawMiners()
     }
 
     /**
@@ -148,8 +153,7 @@ class Controller(private val mvc: MVC) {
     @UiThread
     fun onUpdateOfAllBalancesRequested() {
         safeRunAsIO {
-            val snapshot = mvc.model.miners.reload()
-            snapshot.forEach { miner, status ->
+            mvc.model.miners.snapshot().forEach { miner, status ->
                 if (status.isOn && status.hasPlotReady)
                     miningServices.fetchBalanceOf(miner)
             }

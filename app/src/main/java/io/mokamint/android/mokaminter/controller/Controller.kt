@@ -125,7 +125,7 @@ class Controller(private val mvc: MVC) {
      * all services.
      */
     @UiThread
-    fun onApplicationCreated() {
+    fun onReloadMiners() {
         val snapshot = mvc.model.miners.reload()
         snapshot.forEach { miner, status ->
             if (status.isOn && status.hasPlotReady)

@@ -320,7 +320,6 @@ class MiningServices(private val mvc: MVC) {
                     val jobInfo =
                         JobInfo.Builder(id, ComponentName(mvc, MiningWatcherJobService::class.java))
                             .setUserInitiated(true)
-                            .setPersisted(true)
                             .setPriority(JobInfo.PRIORITY_MAX)
                             .setRequiredNetwork(networkRequest)
                             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)

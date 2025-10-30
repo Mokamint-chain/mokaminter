@@ -42,7 +42,7 @@ class StopMiningReceiver: BroadcastReceiver() {
          */
         fun createIntent(miner: Miner, mvc: MVC): Intent {
             val stopMiningIntent = Intent(mvc, StopMiningReceiver::class.java)
-            stopMiningIntent.putExtra(StopMiningReceiver.UUID, miner.uuid.toString())
+            stopMiningIntent.putExtra(UUID, miner.uuid.toString())
             return stopMiningIntent
         }
     }

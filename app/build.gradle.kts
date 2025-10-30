@@ -74,9 +74,6 @@ dependencies {
     implementation(libs.io.mokamint.plotter)
     implementation(libs.io.hotmoka.crypto)
     implementation(libs.androidx.work.ktx)
-    // forces newer version: remove when imported in mokamint
-    //implementation(libs.io.hotmoka.marshalling)
-    //implementation(libs.io.hotmoka.websockets.client)
     implementation(libs.androidx.preference.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

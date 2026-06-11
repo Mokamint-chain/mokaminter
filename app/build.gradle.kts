@@ -2,21 +2,20 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.androix.safeargs)
 }
 
 android {
     namespace = "io.mokamint.android.mokaminter"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.mokamint.android.mokaminter"
         minSdk = 26
-        targetSdk = 36
-        versionCode = 4
-        versionName = "1.3"
+        targetSdk = 37
+        versionCode = 5
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
